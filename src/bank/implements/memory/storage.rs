@@ -1,10 +1,10 @@
-use crate::bank::traits::storage::{
+use crate::bank::base::storage::{
     AccountStorage, AccountTransfer, GetTransactionByIdError, GetTransactionError,
     GetTransactionsError, Storage, StorageCreateAccountError, StorageCreateTransactionError,
     StorageGetAccountError, StorageUpdateAccountError, TransactionAction, TransactionStorage,
     TransactionTransfer,
 };
-use std::{borrow::Borrow, cell::RefCell, collections::HashMap, path::Iter, rc::Rc};
+use std::collections::HashMap;
 
 pub struct MemAccountStorage {
     storage: HashMap<String, AccountTransfer>,
@@ -55,12 +55,15 @@ impl AccountStorage for MemAccountStorage {
     fn create_account(
         &mut self,
         raw_data: AccountTransfer,
-    ) -> Result<&AccountTransfer, StorageCreateAccountError> {
+    ) -> Result<AccountTransfer, StorageCreateAccountError> {
         match self.storage.entry(raw_data.name.clone()) {
             std::collections::hash_map::Entry::Occupied(_) => {
                 Err(StorageCreateAccountError::AccountAlreadyExists)
             }
-            std::collections::hash_map::Entry::Vacant(vacant) => Ok(vacant.insert(raw_data)),
+            std::collections::hash_map::Entry::Vacant(vacant) => {
+                let inserted = vacant.insert(raw_data);
+                Ok((*inserted).clone())
+            }
         }
     }
 
@@ -165,7 +168,9 @@ impl TransactionStorage for MemTransactionStorage {
 #[cfg(test)]
 mod tests {
 
-    use crate::bank::traits::account::Account;
+    use std::rc::Rc;
+
+    use crate::bank::base::account::{Account, IncBalanceError};
 
     use super::*;
 
@@ -378,15 +383,127 @@ mod tests {
 
     #[test]
     fn test_account_new() {
-        let mut storage = Storage::new(MemAccountStorage::new(), MemTransactionStorage::new());
+        let mut storage = Rc::new(Storage::new(
+            MemAccountStorage::new(),
+            MemTransactionStorage::new(),
+        ));
         let target_name = "test".to_string();
 
         // test create account with new name
         let mut acc = Account::new(target_name.clone(), storage.clone());
         assert_eq!(acc.is_ok(), true);
 
-        // // test error to create acc with same name
-        // acc = Account::new(target_name.clone(), storage);
-        // assert_eq!(acc.is_err(), true);
+        // test error to create acc with same name
+        acc = Account::new(target_name.clone(), storage.clone());
+        assert_eq!(acc.is_err(), true);
+
+        // test transactions
+        let trs = storage
+            .tr_storage
+            .borrow()
+            .account_transactions(target_name.clone())
+            .unwrap();
+        assert_eq!(trs.len(), 1);
+        assert_eq!(trs[0].action, TransactionAction::Registration)
+    }
+
+    #[test]
+    fn test_account_inc_balance() {
+        let mut storage = Rc::new(Storage::new(
+            MemAccountStorage::new(),
+            MemTransactionStorage::new(),
+        ));
+        let target_name = "test".to_string();
+
+        let mut acc = Account::new(target_name.clone(), storage.clone()).unwrap();
+        let tr_id = acc.inc_balance(10).unwrap();
+        assert_eq!(acc.balance(), 10);
+
+        let trs = storage
+            .tr_storage
+            .borrow()
+            .account_transactions(target_name.clone())
+            .unwrap();
+        assert_eq!(trs.len(), 2);
+        assert_eq!(trs[1].action, TransactionAction::Increment);
+        assert_eq!(tr_id, trs[1].id);
+
+        assert_eq!(acc.inc_balance(0).err().unwrap(), IncBalanceError::ZeroInc);
+    }
+
+    #[test]
+    fn test_account_decr_balance() {
+        let mut storage = Rc::new(Storage::new(
+            MemAccountStorage::new(),
+            MemTransactionStorage::new(),
+        ));
+        let target_name = "test".to_string();
+        let mut acc = Account::new(target_name.clone(), storage.clone()).unwrap();
+        acc.inc_balance(100);
+        let tr_id = acc.decr_balance(10).unwrap();
+        assert_eq!(acc.balance(), 90);
+
+        let trs = storage
+            .tr_storage
+            .borrow()
+            .account_transactions(target_name.clone())
+            .unwrap();
+        assert_eq!(trs.len(), 3);
+        assert_eq!(trs[2].action, TransactionAction::Decrement);
+        assert_eq!(tr_id, trs[2].id);
+    }
+
+    #[test]
+    fn test_account_transaction() {
+        let mut storage = Rc::new(Storage::new(
+            MemAccountStorage::new(),
+            MemTransactionStorage::new(),
+        ));
+        let mut acc_f = Account::new("person_1".to_owned(), storage.clone()).unwrap();
+        let mut acc_s = Account::new("person_2".to_owned(), storage.clone()).unwrap();
+
+        acc_f.inc_balance(100);
+        let tr_id = acc_f.make_transaction(10, &mut acc_s).unwrap();
+        assert_eq!(acc_f.balance(), 90);
+        assert_eq!(acc_s.balance(), 10);
+
+        let tr = storage
+            .tr_storage
+            .borrow()
+            .get_transaction_by_id(tr_id)
+            .unwrap();
+        assert_eq!(tr.id, tr_id);
+        assert_eq!(tr.action, TransactionAction::Decrement)
+    }
+
+    #[test]
+    fn test_account_restore() {
+        let mut storage = Rc::new(Storage::new(
+            MemAccountStorage::new(),
+            MemTransactionStorage::new(),
+        ));
+        let acc_name = "person_1".to_owned();
+        let mut acc_f = Account::new(acc_name.clone(), storage.clone()).unwrap();
+        acc_f.inc_balance(10);
+        acc_f.decr_balance(5);
+        acc_f.inc_balance(1);
+        acc_f.inc_balance(20);
+
+        storage
+            .acc_storage
+            .borrow_mut()
+            .update_account(AccountTransfer {
+                name: "person_1".to_owned(),
+                balance: 0,
+            });
+
+        // test account exists
+        let mut res = Account::restore_account_from_transactions(acc_name.clone(), storage.clone());
+        assert_eq!(res.unwrap().balance(), 26);
+
+        // test transactions for account not existed
+        let res =
+            Account::restore_account_from_transactions("not_exists".to_owned(), storage.clone());
+        assert_eq!(res.is_err(), true);
     }
 }

@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
+use std::cell::RefCell;
 
 // data between database and Model
 #[derive(Debug, PartialEq, Eq)]
@@ -7,12 +7,20 @@ pub struct AccountTransfer {
     pub balance: usize,
 }
 
-#[derive(Debug, Clone, Copy)]
+impl Clone for AccountTransfer {
+    fn clone(&self) -> Self {
+        Self {
+            name: self.name.clone(),
+            balance: self.balance,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TransactionAction {
     Registration,
     Increment,
     Decrement,
-    Transaction,
 }
 
 #[derive(Debug)]
@@ -77,8 +85,8 @@ pub enum GetTransactionByIdError {
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Storage<A: AccountStorage, T: TransactionStorage> {
-    pub acc_storage: Rc<RefCell<A>>,
-    pub tr_storage: Rc<RefCell<T>>,
+    pub acc_storage: RefCell<A>,
+    pub tr_storage: RefCell<T>,
 }
 
 pub trait AccountStorage {
@@ -86,7 +94,7 @@ pub trait AccountStorage {
     fn create_account(
         &mut self,
         raw_data: AccountTransfer,
-    ) -> Result<&AccountTransfer, StorageCreateAccountError>;
+    ) -> Result<AccountTransfer, StorageCreateAccountError>;
 
     // gets account from storage if exists
     fn get_account(&self, name: String) -> Result<&AccountTransfer, StorageGetAccountError>;
@@ -119,8 +127,16 @@ pub trait TransactionStorage {
 impl<A: AccountStorage, T: TransactionStorage> Storage<A, T> {
     pub fn new(acc_storage: A, tr_storage: T) -> Self {
         Storage {
-            acc_storage: Rc::new(RefCell::new(acc_storage)),
-            tr_storage: Rc::new(RefCell::new(tr_storage)),
+            acc_storage: RefCell::new(acc_storage),
+            tr_storage: RefCell::new(tr_storage),
         }
     }
+
+    // pub fn acc_storage(&self) -> Rc<RefCell<A>> {
+    //     self.acc_storage.clone()
+    // }
+
+    // pub fn tr_storage(&self) -> Rc<RefCell<T>> {
+    //     self.tr_storage.clone()
+    // }
 }
