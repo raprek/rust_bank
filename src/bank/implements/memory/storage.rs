@@ -23,11 +23,23 @@ pub struct MemTransactionStorage {
     last_tr_id: usize,
 }
 
+impl Default for MemAccountStorage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MemAccountStorage {
     pub fn new() -> Self {
         MemAccountStorage {
             storage: Default::default(),
         }
+    }
+}
+
+impl Default for MemTransactionStorage {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -102,8 +114,8 @@ impl TransactionStorage for MemTransactionStorage {
         self.last_tr_id += 1;
         let item = MemTransactionStorageItem {
             id: self.last_tr_id,
-            amount: amount,
-            action: action,
+            amount,
+            action,
         };
         match self.storage.entry(account_name.clone()) {
             std::collections::hash_map::Entry::Occupied(mut occupied_entry) => {
