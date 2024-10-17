@@ -1,6 +1,6 @@
 use crate::bank::base::storage::{
     AccountStorage, AccountTransfer, GetTransactionByIdError, GetTransactionError,
-    GetTransactionsError, Storage, StorageCreateAccountError, StorageCreateTransactionError,
+    GetTransactionsError, StorageCreateAccountError, StorageCreateTransactionError,
     StorageGetAccountError, StorageUpdateAccountError, TransactionAction, TransactionStorage,
     TransactionTransfer,
 };
@@ -24,7 +24,7 @@ pub struct MemTransactionStorage {
 }
 
 impl MemAccountStorage {
-    fn new() -> Self {
+    pub fn new() -> Self {
         MemAccountStorage {
             storage: Default::default(),
         }
@@ -32,13 +32,15 @@ impl MemAccountStorage {
 }
 
 impl MemTransactionStorage {
-    fn new() -> Self {
+    pub fn new() -> Self {
         MemTransactionStorage {
             storage: Default::default(),
             last_tr_id: 0,
         }
     }
 }
+
+
 
 impl From<MemTransactionStorageItem> for TransactionTransfer {
     fn from(value: MemTransactionStorageItem) -> Self {
@@ -171,6 +173,7 @@ mod tests {
     use std::rc::Rc;
 
     use crate::bank::base::account::{Account, IncBalanceError};
+    use crate::bank::base::storage::Storage;
 
     use super::*;
 
@@ -229,7 +232,7 @@ mod tests {
             name: "not_exist".to_string(),
             balance: 0,
         };
-        let mut result = storage.update_account(raw);
+        let result = storage.update_account(raw);
         assert_eq!(result.is_err(), true);
         assert_eq!(
             result.err().unwrap(),
@@ -383,7 +386,7 @@ mod tests {
 
     #[test]
     fn test_account_new() {
-        let mut storage = Rc::new(Storage::new(
+        let storage = Rc::new(Storage::new(
             MemAccountStorage::new(),
             MemTransactionStorage::new(),
         ));
@@ -409,7 +412,7 @@ mod tests {
 
     #[test]
     fn test_account_inc_balance() {
-        let mut storage = Rc::new(Storage::new(
+        let storage = Rc::new(Storage::new(
             MemAccountStorage::new(),
             MemTransactionStorage::new(),
         ));
@@ -433,13 +436,13 @@ mod tests {
 
     #[test]
     fn test_account_decr_balance() {
-        let mut storage = Rc::new(Storage::new(
+        let storage = Rc::new(Storage::new(
             MemAccountStorage::new(),
             MemTransactionStorage::new(),
         ));
         let target_name = "test".to_string();
         let mut acc = Account::new(target_name.clone(), storage.clone()).unwrap();
-        acc.inc_balance(100);
+        acc.inc_balance(100).unwrap();
         let tr_id = acc.decr_balance(10).unwrap();
         assert_eq!(acc.balance(), 90);
 
@@ -455,14 +458,14 @@ mod tests {
 
     #[test]
     fn test_account_transaction() {
-        let mut storage = Rc::new(Storage::new(
+        let storage = Rc::new(Storage::new(
             MemAccountStorage::new(),
             MemTransactionStorage::new(),
         ));
         let mut acc_f = Account::new("person_1".to_owned(), storage.clone()).unwrap();
         let mut acc_s = Account::new("person_2".to_owned(), storage.clone()).unwrap();
 
-        acc_f.inc_balance(100);
+        let _ = acc_f.inc_balance(100).unwrap();
         let tr_id = acc_f.make_transaction(10, &mut acc_s).unwrap();
         assert_eq!(acc_f.balance(), 90);
         assert_eq!(acc_s.balance(), 10);
@@ -478,18 +481,18 @@ mod tests {
 
     #[test]
     fn test_account_restore() {
-        let mut storage = Rc::new(Storage::new(
+        let storage = Rc::new(Storage::new(
             MemAccountStorage::new(),
             MemTransactionStorage::new(),
         ));
         let acc_name = "person_1".to_owned();
         let mut acc_f = Account::new(acc_name.clone(), storage.clone()).unwrap();
-        acc_f.inc_balance(10);
-        acc_f.decr_balance(5);
-        acc_f.inc_balance(1);
-        acc_f.inc_balance(20);
+        let _ = acc_f.inc_balance(10);
+        let _ = acc_f.decr_balance(5);
+        let _ = acc_f.inc_balance(1);
+        let _ = acc_f.inc_balance(20);
 
-        storage
+        let _ = storage
             .acc_storage
             .borrow_mut()
             .update_account(AccountTransfer {
@@ -498,7 +501,7 @@ mod tests {
             });
 
         // test account exists
-        let mut res = Account::restore_account_from_transactions(acc_name.clone(), storage.clone());
+        let res = Account::restore_account_from_transactions(acc_name.clone(), storage.clone());
         assert_eq!(res.unwrap().balance(), 26);
 
         // test transactions for account not existed

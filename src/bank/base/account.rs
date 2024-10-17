@@ -45,9 +45,9 @@ pub enum TransferError {
 
 #[derive(Debug)]
 pub enum RestoreAccountError {
-    StorageAccountError(String),
-    StorageCreateAccountError(StorageCreateAccountError),
-    GetTransactionError(GetTransactionError),
+    StorageAccount(String),
+    StorageCreateAccount(StorageCreateAccountError),
+    GetTransaction(GetTransactionError),
 }
 
 impl From<StorageCreateTransactionError> for IncBalanceError {
@@ -88,7 +88,7 @@ impl From<StorageUpdateAccountError> for TransferError {
 
 impl From<StorageCreateAccountError> for RestoreAccountError {
     fn from(value: StorageCreateAccountError) -> Self {
-        RestoreAccountError::StorageCreateAccountError(value)
+        RestoreAccountError::StorageCreateAccount(value)
     }
 }
 
@@ -237,7 +237,7 @@ impl<S: AccountStorage, T: TransactionStorage> Account<S, T> {
                     }),
                     Err(err) => match err {
                         StorageUpdateAccountError::StorageError(e) => {
-                            Err(RestoreAccountError::StorageAccountError(e))
+                            Err(RestoreAccountError::StorageAccount(e))
                         }
 
                         // creates account if not existed
@@ -252,7 +252,7 @@ impl<S: AccountStorage, T: TransactionStorage> Account<S, T> {
                     },
                 };
             }
-            Err(err) => Err(RestoreAccountError::GetTransactionError(err)),
+            Err(err) => Err(RestoreAccountError::GetTransaction(err)),
         }
     }
 
