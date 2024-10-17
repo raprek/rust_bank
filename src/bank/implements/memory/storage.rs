@@ -8,7 +8,7 @@ use std::collections::HashMap;
 
 pub struct MemAccountStorage {
     storage: HashMap<String, AccountTransfer>,
-    // history_storage:
+    // name reserved for bank fees account
     fee_acc_name: String,
 }
 
@@ -111,16 +111,22 @@ impl AccountStorage for MemAccountStorage {
             Err(err) => match err {
                 StorageGetAccountError::StorageError(e) => Err(FeeAccountError::StorageError(e)),
                 StorageGetAccountError::AccountNotExists => {
-                    return match self.create_account(AccountTransfer {
+                    match self.create_account(AccountTransfer {
                         name: self.fee_acc_name.clone(),
                         balance: 0,
                     }) {
                         Ok(acc) => Ok(acc),
                         Err(err) => match err {
-                            StorageCreateAccountError::StorageError(e) => Err(FeeAccountError::StorageError(e)),
-                            StorageCreateAccountError::AccountAlreadyExists => Err(FeeAccountError::StorageError("collision fee acc existed".to_owned())),
+                            StorageCreateAccountError::StorageError(e) => {
+                                Err(FeeAccountError::StorageError(e))
+                            }
+                            StorageCreateAccountError::AccountAlreadyExists => {
+                                Err(FeeAccountError::StorageError(
+                                    "collision fee acc existed".to_owned(),
+                                ))
+                            }
                         },
-                    };
+                    }
                 }
             },
         }
@@ -227,7 +233,10 @@ mod tests {
 
         let result = storage.get_account(test_name.clone());
         assert_eq!(result.is_ok(), true);
-        assert_eq!(result.unwrap(), storage.storage.get(&test_name).unwrap().clone());
+        assert_eq!(
+            result.unwrap(),
+            storage.storage.get(&test_name).unwrap().clone()
+        );
     }
 
     #[test]
@@ -511,13 +520,28 @@ mod tests {
         assert_eq!(tr.id, tr_id);
         assert_eq!(tr.action, TransactionAction::Decrement);
 
-        assert_eq!(storage.acc_storage.borrow_mut().fee_account().unwrap().balance, 0);
+        assert_eq!(
+            storage
+                .acc_storage
+                .borrow_mut()
+                .fee_account()
+                .unwrap()
+                .balance,
+            0
+        );
 
         // tr with fees
         let _ = acc_f.make_transaction(10, &mut acc_s, Some(10)).unwrap();
         assert_eq!(acc_f.balance(), 70);
-        assert_eq!(storage.acc_storage.borrow_mut().fee_account().unwrap().balance, 10);
-        
+        assert_eq!(
+            storage
+                .acc_storage
+                .borrow_mut()
+                .fee_account()
+                .unwrap()
+                .balance,
+            10
+        );
     }
 
     #[test]

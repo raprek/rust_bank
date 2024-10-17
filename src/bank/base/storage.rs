@@ -137,6 +137,10 @@ impl<A: AccountStorage, T: TransactionStorage> Storage<A, T> {
 
 impl Display for TransactionTransfer {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "ID: {}, Action: {:?}, Amount: {}", self.id, self.action, self.amount)
+        write!(
+            f,
+            "ID: {}, Action: {:?}, Amount: {}",
+            self.id, self.action, self.amount
+        )
     }
 }

@@ -41,8 +41,7 @@ pub enum TransferError {
     NotEnoughBalance,
     CreateTransaction(StorageCreateTransactionError),
     UpdateAccount(StorageUpdateAccountError),
-    GetFeeAccount(FeeAccountError)
-
+    GetFeeAccount(FeeAccountError),
 }
 
 #[derive(Debug)]
@@ -100,7 +99,7 @@ impl From<StorageCreateAccountError> for RestoreAccountError {
     }
 }
 
-impl <S: AccountStorage, T: TransactionStorage> Display for Account<S, T> {
+impl<S: AccountStorage, T: TransactionStorage> Display for Account<S, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Account: {}. Balance: {}", self.name, self.balance)
     }
@@ -225,7 +224,6 @@ impl<S: AccountStorage, T: TransactionStorage> Account<S, T> {
                 .borrow_mut()
                 .update_account(fee_acc)?;
 
-
             Ok(self_tr.id)
         }
     }
@@ -254,7 +252,7 @@ impl<S: AccountStorage, T: TransactionStorage> Account<S, T> {
 
                 let mut acc_storage_ref = storage.acc_storage.borrow_mut();
                 // try update account or recreate wit new data
-                return match acc_storage_ref.update_account(acc_t.clone()) {
+                match acc_storage_ref.update_account(acc_t.clone()) {
                     Ok(acc) => Ok(Account {
                         name: acc.name.clone(),
                         balance: acc.balance,
@@ -275,7 +273,7 @@ impl<S: AccountStorage, T: TransactionStorage> Account<S, T> {
                             })
                         }
                     },
-                };
+                }
             }
             Err(err) => Err(RestoreAccountError::GetTransaction(err)),
         }

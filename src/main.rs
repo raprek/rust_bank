@@ -1,9 +1,14 @@
 use std::rc::Rc;
 
-use rust_bank::bank::{base::{account::Account, storage::{Storage, TransactionStorage}}, implements::memory::storage::{MemAccountStorage, MemTransactionStorage}};
+use rust_bank::bank::{
+    base::{
+        account::Account,
+        storage::{Storage, TransactionStorage},
+    },
+    implements::memory::storage::{MemAccountStorage, MemTransactionStorage},
+};
 
 fn main() {
-
     // init base storage
     let storage = Rc::new(Storage::new(
         MemAccountStorage::new(),
@@ -26,13 +31,21 @@ fn main() {
     let mut to_acc = Account::new("some_name_2".to_owned(), storage.clone()).unwrap();
     let tr_fee = 1;
     let tr_amount = 3;
-    println!("Before transaction. Fee: {tr_fee}. Amount: {tr_amount} Account from: {acc}, to {to_acc}");
+    println!(
+        "Before transaction. Fee: {tr_fee}. Amount: {tr_amount} Account from: {acc}, to {to_acc}"
+    );
     let _ = acc.make_transaction(tr_amount, &mut to_acc, Some(tr_fee));
-    println!("After transaction. Fee: {tr_fee}. Amount: {tr_amount} Account from: {acc}, to {to_acc}");
+    println!(
+        "After transaction. Fee: {tr_fee}. Amount: {tr_amount} Account from: {acc}, to {to_acc}"
+    );
 
     // transactions
-    let trs = storage.clone().tr_storage.borrow().account_transactions(acc.name.clone()).unwrap();
+    let trs = storage
+        .clone()
+        .tr_storage
+        .borrow()
+        .account_transactions(acc.name.clone())
+        .unwrap();
     println!("Show transactions for an account: {acc}");
     trs.iter().for_each(|tr| println!("Tr: {tr}"));
-    
 }
