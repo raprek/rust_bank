@@ -7,15 +7,6 @@ pub struct AccountTransfer {
     pub balance: usize,
 }
 
-impl Clone for AccountTransfer {
-    fn clone(&self) -> Self {
-        Self {
-            name: self.name.clone(),
-            balance: self.balance,
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TransactionAction {
     Registration,
@@ -89,6 +80,15 @@ pub struct Storage<A: AccountStorage, T: TransactionStorage> {
     pub tr_storage: RefCell<T>,
 }
 
+impl Clone for AccountTransfer {
+    fn clone(&self) -> Self {
+        Self {
+            name: self.name.clone(),
+            balance: self.balance,
+        }
+    }
+}
+
 pub trait AccountStorage {
     // creates a new account if not exists (if exists returns None)
     fn create_account(
@@ -131,12 +131,4 @@ impl<A: AccountStorage, T: TransactionStorage> Storage<A, T> {
             tr_storage: RefCell::new(tr_storage),
         }
     }
-
-    // pub fn acc_storage(&self) -> Rc<RefCell<A>> {
-    //     self.acc_storage.clone()
-    // }
-
-    // pub fn tr_storage(&self) -> Rc<RefCell<T>> {
-    //     self.tr_storage.clone()
-    // }
 }

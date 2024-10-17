@@ -40,8 +40,6 @@ impl MemTransactionStorage {
     }
 }
 
-
-
 impl From<MemTransactionStorageItem> for TransactionTransfer {
     fn from(value: MemTransactionStorageItem) -> Self {
         TransactionTransfer {
