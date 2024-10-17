@@ -1,5 +1,5 @@
 use crate::bank::base::storage::{
-    AccountStorage, AccountTransfer, GetTransactionByIdError, GetTransactionError,
+    AccountStorage, AccountTransfer, FeeAccountError, GetTransactionByIdError, GetTransactionError,
     GetTransactionsError, StorageCreateAccountError, StorageCreateTransactionError,
     StorageGetAccountError, StorageUpdateAccountError, TransactionAction, TransactionStorage,
     TransactionTransfer,
@@ -9,6 +9,7 @@ use std::collections::HashMap;
 pub struct MemAccountStorage {
     storage: HashMap<String, AccountTransfer>,
     // history_storage:
+    fee_acc_name: String,
 }
 
 #[derive(Clone, Copy)]
@@ -33,6 +34,7 @@ impl MemAccountStorage {
     pub fn new() -> Self {
         MemAccountStorage {
             storage: Default::default(),
+            fee_acc_name: "fee_acc".to_owned(),
         }
     }
 }
@@ -79,9 +81,9 @@ impl AccountStorage for MemAccountStorage {
         }
     }
 
-    fn get_account(&self, name: String) -> Result<&AccountTransfer, StorageGetAccountError> {
+    fn get_account(&self, name: String) -> Result<AccountTransfer, StorageGetAccountError> {
         match self.storage.get(&name) {
-            Some(acc) => Ok(acc),
+            Some(acc) => Ok(acc.clone()),
             None => Err(StorageGetAccountError::AccountNotExists),
         }
     }
@@ -89,7 +91,7 @@ impl AccountStorage for MemAccountStorage {
     fn update_account(
         &mut self,
         raw_data: AccountTransfer,
-    ) -> Result<&AccountTransfer, StorageUpdateAccountError> {
+    ) -> Result<AccountTransfer, StorageUpdateAccountError> {
         let key = raw_data.name.clone();
         match self.storage.entry(key.clone()) {
             std::collections::hash_map::Entry::Occupied(mut occ) => {
@@ -100,7 +102,28 @@ impl AccountStorage for MemAccountStorage {
             }
         }
 
-        Ok(self.storage.get(&key).unwrap())
+        Ok(self.storage.get(&key).unwrap().clone())
+    }
+
+    fn fee_account(&mut self) -> Result<AccountTransfer, FeeAccountError> {
+        match self.get_account(self.fee_acc_name.clone()) {
+            Ok(acc) => Ok(acc),
+            Err(err) => match err {
+                StorageGetAccountError::StorageError(e) => Err(FeeAccountError::StorageError(e)),
+                StorageGetAccountError::AccountNotExists => {
+                    return match self.create_account(AccountTransfer {
+                        name: self.fee_acc_name.clone(),
+                        balance: 0,
+                    }) {
+                        Ok(acc) => Ok(acc),
+                        Err(err) => match err {
+                            StorageCreateAccountError::StorageError(e) => Err(FeeAccountError::StorageError(e)),
+                            StorageCreateAccountError::AccountAlreadyExists => Err(FeeAccountError::StorageError("collision fee acc existed".to_owned())),
+                        },
+                    };
+                }
+            },
+        }
     }
 }
 
@@ -204,7 +227,7 @@ mod tests {
 
         let result = storage.get_account(test_name.clone());
         assert_eq!(result.is_ok(), true);
-        assert_eq!(result.unwrap(), storage.storage.get(&test_name).unwrap());
+        assert_eq!(result.unwrap(), storage.storage.get(&test_name).unwrap().clone());
     }
 
     #[test]
@@ -476,7 +499,7 @@ mod tests {
         let mut acc_s = Account::new("person_2".to_owned(), storage.clone()).unwrap();
 
         let _ = acc_f.inc_balance(100).unwrap();
-        let tr_id = acc_f.make_transaction(10, &mut acc_s).unwrap();
+        let tr_id = acc_f.make_transaction(10, &mut acc_s, None).unwrap();
         assert_eq!(acc_f.balance(), 90);
         assert_eq!(acc_s.balance(), 10);
 
@@ -486,7 +509,15 @@ mod tests {
             .get_transaction_by_id(tr_id)
             .unwrap();
         assert_eq!(tr.id, tr_id);
-        assert_eq!(tr.action, TransactionAction::Decrement)
+        assert_eq!(tr.action, TransactionAction::Decrement);
+
+        assert_eq!(storage.acc_storage.borrow_mut().fee_account().unwrap().balance, 0);
+
+        // tr with fees
+        let _ = acc_f.make_transaction(10, &mut acc_s, Some(10)).unwrap();
+        assert_eq!(acc_f.balance(), 70);
+        assert_eq!(storage.acc_storage.borrow_mut().fee_account().unwrap().balance, 10);
+        
     }
 
     #[test]

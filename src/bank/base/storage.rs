@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::{cell::RefCell, fmt::Display};
 
 // data between database and Model
 #[derive(Debug, PartialEq, Eq)]
@@ -21,12 +21,6 @@ pub struct TransactionTransfer {
     pub amount: usize,
     pub account_name: String,
 }
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct AccountAlreadyExists;
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct AccountNotExists;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct StorageConnectionError {
@@ -74,6 +68,11 @@ pub enum GetTransactionByIdError {
     NotFound,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum FeeAccountError {
+    StorageError(String),
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct Storage<A: AccountStorage, T: TransactionStorage> {
     pub acc_storage: RefCell<A>,
@@ -97,13 +96,16 @@ pub trait AccountStorage {
     ) -> Result<AccountTransfer, StorageCreateAccountError>;
 
     // gets account from storage if exists
-    fn get_account(&self, name: String) -> Result<&AccountTransfer, StorageGetAccountError>;
+    fn get_account(&self, name: String) -> Result<AccountTransfer, StorageGetAccountError>;
 
     // updates account data in storage
     fn update_account(
         &mut self,
         transfer_data: AccountTransfer,
-    ) -> Result<&AccountTransfer, StorageUpdateAccountError>;
+    ) -> Result<AccountTransfer, StorageUpdateAccountError>;
+
+    // returns special fee account to store money from transactions
+    fn fee_account(&mut self) -> Result<AccountTransfer, FeeAccountError>;
 }
 
 pub trait TransactionStorage {
@@ -130,5 +132,11 @@ impl<A: AccountStorage, T: TransactionStorage> Storage<A, T> {
             acc_storage: RefCell::new(acc_storage),
             tr_storage: RefCell::new(tr_storage),
         }
+    }
+}
+
+impl Display for TransactionTransfer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ID: {}, Action: {:?}, Amount: {}", self.id, self.action, self.amount)
     }
 }

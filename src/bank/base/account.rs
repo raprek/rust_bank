@@ -1,11 +1,11 @@
-use std::rc::Rc;
+use std::{fmt::Display, rc::Rc};
 
 use crate::bank::base::storage::{
     AccountStorage, AccountTransfer, Storage, StorageCreateTransactionError,
     StorageUpdateAccountError, TransactionAction, TransactionStorage,
 };
 
-use super::storage::{GetTransactionError, StorageCreateAccountError};
+use super::storage::{FeeAccountError, GetTransactionError, StorageCreateAccountError};
 
 #[derive(Debug)]
 pub struct Account<A: AccountStorage, T: TransactionStorage> {
@@ -39,8 +39,10 @@ pub enum DecBalanceError {
 pub enum TransferError {
     ZeroTransfer,
     NotEnoughBalance,
-    TransactionStorage(StorageCreateTransactionError),
-    AccountStorage(StorageUpdateAccountError),
+    CreateTransaction(StorageCreateTransactionError),
+    UpdateAccount(StorageUpdateAccountError),
+    GetFeeAccount(FeeAccountError)
+
 }
 
 #[derive(Debug)]
@@ -76,19 +78,31 @@ impl From<StorageCreateTransactionError> for DecBalanceError {
 
 impl From<StorageCreateTransactionError> for TransferError {
     fn from(value: StorageCreateTransactionError) -> Self {
-        TransferError::TransactionStorage(value)
+        TransferError::CreateTransaction(value)
     }
 }
 
 impl From<StorageUpdateAccountError> for TransferError {
     fn from(value: StorageUpdateAccountError) -> Self {
-        TransferError::AccountStorage(value)
+        TransferError::UpdateAccount(value)
+    }
+}
+
+impl From<FeeAccountError> for TransferError {
+    fn from(value: FeeAccountError) -> Self {
+        TransferError::GetFeeAccount(value)
     }
 }
 
 impl From<StorageCreateAccountError> for RestoreAccountError {
     fn from(value: StorageCreateAccountError) -> Self {
         RestoreAccountError::StorageCreateAccount(value)
+    }
+}
+
+impl <S: AccountStorage, T: TransactionStorage> Display for Account<S, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Account: {}. Balance: {}", self.name, self.balance)
     }
 }
 
@@ -165,14 +179,16 @@ impl<S: AccountStorage, T: TransactionStorage> Account<S, T> {
         &mut self,
         value: usize,
         to: &mut Account<S, T>,
+        fee_amount: Option<usize>,
     ) -> Result<usize, TransferError> {
+        let def_fee = 0;
         if value == 0 {
             Err(TransferError::ZeroTransfer)
-        } else if value > self.balance {
+        } else if value + fee_amount.unwrap_or(def_fee) > self.balance {
             Err(TransferError::NotEnoughBalance)
         } else {
             let mut raw_self = self.transfer_data();
-            raw_self.balance -= value;
+            raw_self.balance -= value + fee_amount.unwrap_or(def_fee);
 
             let mut raw_to = to.transfer_data();
             raw_to.balance += value;
@@ -184,10 +200,10 @@ impl<S: AccountStorage, T: TransactionStorage> Account<S, T> {
                 .update_account(raw_self)?;
             let self_tr = self.storage.tr_storage.borrow_mut().create_transaction(
                 self.name.clone(),
-                value,
+                value + fee_amount.unwrap_or(def_fee),
                 TransactionAction::Decrement,
             )?;
-            self.balance -= value;
+            self.balance -= value + fee_amount.unwrap_or(def_fee);
 
             // increment balance of receiver
             self.storage
@@ -200,6 +216,15 @@ impl<S: AccountStorage, T: TransactionStorage> Account<S, T> {
                 TransactionAction::Increment,
             )?;
             to.balance += value;
+
+            // increment fee acc
+            let mut fee_acc = self.storage.acc_storage.borrow_mut().fee_account()?;
+            fee_acc.balance += fee_amount.unwrap_or(def_fee);
+            self.storage
+                .acc_storage
+                .borrow_mut()
+                .update_account(fee_acc)?;
+
 
             Ok(self_tr.id)
         }
