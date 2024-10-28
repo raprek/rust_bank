@@ -1,0 +1,9 @@
+[package]
+name = "bank_protocol"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+uuid = { version = "1.11.0", features = ["v4"] }
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }

@@ -1,0 +1,11 @@
+[package]
+name = "bank_server"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bank_protocol = { path = "../bank_protocol" }
+bank_actions = { path = "../bank_actions" }
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+uuid = { version = "1.11.0", features = ["v4"] }

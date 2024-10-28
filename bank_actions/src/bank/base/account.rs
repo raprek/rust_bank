@@ -5,7 +5,7 @@ use crate::bank::base::storage::{
     StorageUpdateAccountError, TransactionAction, TransactionStorage,
 };
 
-use super::storage::{FeeAccountError, GetTransactionError, StorageCreateAccountError};
+use super::storage::{FeeAccountError, GetTransactionError, StorageCreateAccountError, StorageGetAccountError};
 
 #[derive(Debug)]
 pub struct Account<A: AccountStorage, T: TransactionStorage> {
@@ -45,10 +45,28 @@ pub enum TransferError {
 }
 
 #[derive(Debug)]
+pub enum GetAccountError {
+    AccountStorage,
+    AccountNotExists,
+}
+
+#[derive(Debug)]
 pub enum RestoreAccountError {
     StorageAccount(String),
     StorageCreateAccount(StorageCreateAccountError),
     GetTransaction(GetTransactionError),
+}
+
+impl ToString for CreateAccountError {
+    fn to_string(&self) -> String {
+        match self {
+            CreateAccountError::TransactionStorage(_) => "Transaction storage err".to_string(),
+            CreateAccountError::AccountStorage(err) => match err {
+                StorageCreateAccountError::StorageError(_) => "Account storage err".to_string(),
+                StorageCreateAccountError::AccountAlreadyExists => "Account name occupied".to_string()
+            },
+        }  
+    }
 }
 
 impl From<StorageCreateTransactionError> for IncBalanceError {
@@ -104,6 +122,7 @@ impl<S: AccountStorage, T: TransactionStorage> Display for Account<S, T> {
         write!(f, "Account: {}. Balance: {}", self.name, self.balance)
     }
 }
+
 
 impl<S: AccountStorage, T: TransactionStorage> Account<S, T> {
     // task 1 create an account
@@ -283,6 +302,14 @@ impl<S: AccountStorage, T: TransactionStorage> Account<S, T> {
         AccountTransfer {
             name: self.name.clone(),
             balance: self.balance,
+        }
+    }
+
+    pub fn account(acc_name: &String, storage: Rc<Storage<S, T>>) -> Result<Account<S, T>, GetAccountError> {
+        match storage.acc_storage.borrow_mut().get_account(acc_name.clone()) {
+            Ok(acc) => Ok(Account { balance:acc.balance, name: acc_name.clone(), storage: storage.clone() }),
+           Err(StorageGetAccountError::StorageError(_)) => {Err(GetAccountError::AccountStorage)},
+           Err(StorageGetAccountError::AccountNotExists) => Err(GetAccountError::AccountNotExists)
         }
     }
 
