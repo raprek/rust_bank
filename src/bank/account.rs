@@ -3,6 +3,7 @@ use std::fmt::Display;
 use crate::bank::storage::{
     AccountStorage, AccountTransfer, TransactionAction, TransactionStorage,
 };
+use thiserror::Error as TError;
 
 use super::storage::Error as StorageError;
 
@@ -18,13 +19,19 @@ impl Display for Account {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(TError, Debug, PartialEq, Eq)]
 pub enum Error {
+    #[error("storage error: `{0}`")]
     Storage(String),
+    #[error("account already exists")]
     AccountAlreadyExists,
+    #[error("account not exists")]
     AccountNotExists,
+    #[error("empty transaction")]
     EmptyTransaction,
+    #[error("not enough money")]
     NotEnoughMoney,
+    #[error("transaction not exists")]
     TransactionNotExists,
 }
 
@@ -110,6 +117,7 @@ impl Account {
     }
 
     // task 3 make transactions from an one account to another
+    // errors AccountNotExists Storage
     pub fn make_transaction<S: AccountStorage, T: TransactionStorage>(
         &mut self,
         value: usize,

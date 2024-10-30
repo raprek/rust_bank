@@ -1,4 +1,5 @@
 use std::fmt::Display;
+use thiserror::Error as TError;
 
 // data between database and Model
 #[derive(Debug, PartialEq, Eq)]
@@ -39,16 +40,20 @@ impl Clone for AccountTransfer {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(TError, Debug, PartialEq, Eq)]
 pub enum Error {
+    #[error("storage error: `{0}`")]
     StorageError(String),
+    #[error("account already exists")]
     AccountAlreadyExists,
+    #[error("account not exists")]
     AccountNotExists,
+    #[error("transaction not exists")]
     TransactionNotExists,
 }
 
 pub trait AccountStorage {
-    // creates a new account if not exists (if exists returns None)
+    // creates a new account if not exists
     // Errors: AccountAlreadyExists, StorageError
     fn create_account(&mut self, raw_data: AccountTransfer) -> Result<AccountTransfer, Error>;
 
@@ -61,6 +66,7 @@ pub trait AccountStorage {
     // returns special fee account to store money from transactions
     fn fee_account(&self) -> Result<AccountTransfer, Error>;
 
+    // returns list of accounts
     fn accounts(&self) -> Result<Vec<AccountTransfer>, Error>;
 }
 
