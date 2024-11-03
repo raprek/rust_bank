@@ -53,12 +53,12 @@ impl Clone for TransactionAction {
     fn clone(&self) -> Self {
         match self {
             Self::Registration => Self::Registration,
-            Self::Add(arg0) => Self::Add(arg0.clone()),
-            Self::Withdraw(arg0) => Self::Withdraw(arg0.clone()),
+            Self::Add(arg0) => Self::Add(*arg0),
+            Self::Withdraw(arg0) => Self::Withdraw(*arg0),
             Self::Transfer { to, value, fee } => Self::Transfer {
                 to: to.clone(),
-                value: value.clone(),
-                fee: fee.clone(),
+                value: *value,
+                fee: *fee,
             },
         }
     }

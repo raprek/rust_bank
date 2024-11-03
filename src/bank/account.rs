@@ -1,4 +1,4 @@
-use std::{clone, fmt::Display};
+use std::fmt::Display;
 
 use crate::bank::storage::{
     AccountStorage, AccountTransfer, TransactionAction, TransactionStorage,
@@ -6,7 +6,7 @@ use crate::bank::storage::{
 use thiserror::Error as TError;
 
 use super::{
-    storage::{Error as StorageError, TransactionTransfer},
+    storage::Error as StorageError,
     transactions::Transaction,
 };
 
@@ -64,7 +64,7 @@ impl From<&Account> for AccountTransfer {
     fn from(value: &Account) -> Self {
         AccountTransfer {
             name: value.name.clone(),
-            balance: value.balance.clone(),
+            balance: value.balance,
             trs: value.trs.clone(),
         }
     }
@@ -82,7 +82,7 @@ impl Account {
         acc_storage.create_account(AccountTransfer::new(name.clone(), None))?;
         tr_storage.create_transaction(name.clone(), TransactionAction::Registration)?;
         Ok(Account {
-            name: name,
+            name,
             balance: Default::default(),
             trs: Vec::new(),
         })
@@ -205,10 +205,8 @@ impl Account {
         trs: Vec<Transaction>,
         acc_storage: &mut S,
     ) -> Result<Account, Error> {
-        let mut acc = Account::default();
-        acc.name = account_name;
-
-        acc.trs = trs.iter().map(|tr| tr.id).collect();
+        let mut acc = Account { name: account_name, trs: trs.iter().map(|tr| tr.id).collect(), ..Default::default() };
+        
 
         for tr in trs {
             match tr.action {

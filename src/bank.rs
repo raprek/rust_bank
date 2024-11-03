@@ -108,7 +108,7 @@ impl<A: AccountStorage + Default, T: TransactionStorage + Default> Bank<A, T> {
 
         for tr in trs {
             match tr.action.clone() {
-                TransactionAction::Transfer { to, value, fee } => {
+                TransactionAction::Transfer { to, value: _, fee: _ } => {
                     match restore_map.entry(to.clone()) {
                         std::collections::hash_map::Entry::Occupied(mut occupied_entry) => {
                             occupied_entry.get_mut().push(Transaction::from(tr.clone()));

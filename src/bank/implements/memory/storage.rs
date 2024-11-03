@@ -117,7 +117,7 @@ impl TransactionStorage for MemTransactionStorage {
         let item = MemTransactionStorageItem {
             id: self.last_tr_id,
             action,
-            account_name: account_name,
+            account_name,
         };
         self.storage.push(item.clone());
         Ok(TransactionTransfer::from(item))
