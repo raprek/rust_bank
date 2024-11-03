@@ -6,16 +6,23 @@ use thiserror::Error as TError;
 pub struct AccountTransfer {
     pub name: String,
     pub balance: usize,
+    pub trs: Vec<usize>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, PartialEq, Default)]
 pub enum TransactionAction {
+    #[default]
     Registration,
-    Increment(usize),
-    Decrement(usize),
+    Add(usize),
+    Withdraw(usize),
+    Transfer {
+        to: String, // account id
+        value: usize,
+        fee: usize,
+    },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct TransactionTransfer {
     pub id: usize,
     pub action: TransactionAction,
@@ -27,6 +34,7 @@ impl AccountTransfer {
         Self {
             name,
             balance: balance.unwrap_or_default(),
+            trs: Default::default(),
         }
     }
 }
@@ -36,6 +44,22 @@ impl Clone for AccountTransfer {
         Self {
             name: self.name.clone(),
             balance: self.balance,
+            trs: self.trs.clone(),
+        }
+    }
+}
+
+impl Clone for TransactionAction {
+    fn clone(&self) -> Self {
+        match self {
+            Self::Registration => Self::Registration,
+            Self::Add(arg0) => Self::Add(arg0.clone()),
+            Self::Withdraw(arg0) => Self::Withdraw(arg0.clone()),
+            Self::Transfer { to, value, fee } => Self::Transfer {
+                to: to.clone(),
+                value: value.clone(),
+                fee: fee.clone(),
+            },
         }
     }
 }
@@ -77,29 +101,26 @@ pub trait TransactionStorage {
         action: TransactionAction,
     ) -> Result<TransactionTransfer, Error>;
     fn transactions(&self) -> Result<Vec<TransactionTransfer>, Error>;
-    fn account_transactions(&self, account_name: String)
-        -> Result<Vec<TransactionTransfer>, Error>;
     fn transaction_by_id(&self, id: usize) -> Result<TransactionTransfer, Error>;
 }
 
 impl Display for TransactionTransfer {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.action {
+        match &self.action {
             TransactionAction::Registration => {
                 write!(f, "ID: {}, Action: {:?}", self.id, self.action)
             }
-            TransactionAction::Increment(amount) => {
-                write!(
-                    f,
-                    "ID: {}, Action: {:?}, Amount: {}",
-                    self.id, self.action, amount
-                )
+            TransactionAction::Add(value) => {
+                write!(f, "ID: {}, Action: Add, Amount: {}", self.id, value)
             }
-            TransactionAction::Decrement(amount) => {
+            TransactionAction::Withdraw(value) => {
+                write!(f, "ID: {}, Action: Withdraw, Amount: {}", self.id, value)
+            }
+            TransactionAction::Transfer { to, value, fee } => {
                 write!(
                     f,
-                    "ID: {}, Action: {:?}, Amount: {}",
-                    self.id, self.action, amount
+                    "ID: {}, Action: Transfer, To: {}, Amount: {}, Fee: {}",
+                    self.id, to, value, fee
                 )
             }
         }

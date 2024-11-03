@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use super::storage::{TransactionAction, TransactionTransfer};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Transaction {
     pub id: usize,
     pub action: TransactionAction,

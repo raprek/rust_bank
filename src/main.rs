@@ -17,21 +17,21 @@ fn main() {
     let mut acc = bank.create_account("some_acc".to_string()).unwrap();
     println!("Created an account: {acc}");
 
-    // incr balance
+    // incr balance | balance 10
     let _ = bank.inc_acc_balance(&mut acc, 10);
     println!("Account after increment on 10: {acc}");
 
-    // decr balance
+    // decr balance | balance 8
     let _ = bank.decr_acc_balance(&mut acc, 2);
     println!("Account after decrement balance on 2: {acc}");
 
-    // transaction
     let mut to_acc = bank.create_account("to_acc".to_string()).unwrap();
 
     let tr_amount = 3;
     println!(
         "Before transaction. Fee: {tr_fee}. Amount: {tr_amount} Account from: {acc}, to {to_acc}"
     );
+    // balance acc 8 - 4 = 3
     let _ = bank.make_transaction(&mut acc, &mut to_acc, tr_amount);
     println!(
         "After transaction. Fee: {tr_fee}. Amount: {tr_amount} Account from: {acc}, to {to_acc}"
@@ -64,15 +64,8 @@ fn main() {
         .for_each(|acc| println!("Acc: {acc}"));
     println!("----------------------------");
 
-    println!("Show accs in sec bank before restore:");
-    bank_sec
-        .accounts()
-        .unwrap()
-        .into_iter()
-        .for_each(|acc| println!("Acc: {acc}"));
-    println!("----------------------------");
-
-    let _ = bank_sec.restore_accounts_from_bank_transactions(&bank);
+    bank_sec = Bank::restore_accounts_from_transactions(bank.transactions().unwrap(), Some(tr_fee))
+        .unwrap();
     println!("Show accs in sec bank after restore:");
     bank_sec
         .accounts()
