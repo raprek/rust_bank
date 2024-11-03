@@ -1,10 +1,7 @@
 use std::collections::HashMap;
 
 use account::{Account, Error as AccError};
-use storage::{
-    AccountStorage, Error as StorageError, TransactionAction, TransactionStorage,
-    TransactionTransfer,
-};
+use storage::{AccountStorage, Error as StorageError, TransactionAction, TransactionStorage};
 use transactions::Transaction;
 
 pub mod account;
@@ -74,11 +71,11 @@ impl<A: AccountStorage + Default, T: TransactionStorage + Default> Bank<A, T> {
         account_name: String,
     ) -> Result<Account, AccError> {
         let acc = Account::from(self.acc_storage.get_account(account_name)?);
-        Ok(Account::from_transactions(
+        Account::from_transactions(
             acc.name.clone(),
             acc.transactions(&self.tr_storage)?,
             &mut self.acc_storage,
-        )?)
+        )
     }
 
     pub fn transactions(&self) -> Result<Vec<Transaction>, StorageError> {
@@ -92,7 +89,7 @@ impl<A: AccountStorage + Default, T: TransactionStorage + Default> Bank<A, T> {
 
     pub fn account_transactions(&self, account_name: String) -> Result<Vec<Transaction>, AccError> {
         let acc = Account::from(self.acc_storage.get_account(account_name)?);
-        Ok(acc.transactions(&self.tr_storage)?)
+        acc.transactions(&self.tr_storage)
     }
 
     pub fn transaction_by_id(&self, id: usize) -> Result<Transaction, StorageError> {
@@ -107,25 +104,27 @@ impl<A: AccountStorage + Default, T: TransactionStorage + Default> Bank<A, T> {
         let mut restore_map: HashMap<String, Vec<Transaction>> = HashMap::new();
 
         for tr in trs {
-            match tr.action.clone() {
-                TransactionAction::Transfer { to, value: _, fee: _ } => {
-                    match restore_map.entry(to.clone()) {
-                        std::collections::hash_map::Entry::Occupied(mut occupied_entry) => {
-                            occupied_entry.get_mut().push(Transaction::from(tr.clone()));
-                        }
-                        std::collections::hash_map::Entry::Vacant(vacant_entry) => {
-                            vacant_entry.insert(vec![Transaction::from(tr.clone())]);
-                        }
+            if let TransactionAction::Transfer {
+                to,
+                value: _,
+                fee: _,
+            } = tr.action.clone()
+            {
+                match restore_map.entry(to.clone()) {
+                    std::collections::hash_map::Entry::Occupied(mut occupied_entry) => {
+                        occupied_entry.get_mut().push(tr.clone());
+                    }
+                    std::collections::hash_map::Entry::Vacant(vacant_entry) => {
+                        vacant_entry.insert(vec![tr.clone()]);
                     }
                 }
-                _ => (),
             }
             match restore_map.entry(tr.account_name.clone()) {
                 std::collections::hash_map::Entry::Occupied(mut occupied_entry) => {
-                    occupied_entry.get_mut().push(Transaction::from(tr.clone()));
+                    occupied_entry.get_mut().push(tr.clone());
                 }
                 std::collections::hash_map::Entry::Vacant(vacant_entry) => {
-                    vacant_entry.insert(vec![Transaction::from(tr.clone())]);
+                    vacant_entry.insert(vec![tr.clone()]);
                 }
             }
 

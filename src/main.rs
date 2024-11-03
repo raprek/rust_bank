@@ -50,13 +50,6 @@ fn main() {
     println!("----------------------------");
 
     // trs restore
-
-    let mut bank_sec = Bank::new(
-        MemAccountStorage::new().unwrap(),
-        MemTransactionStorage::new(),
-        Some(tr_fee),
-    );
-
     println!("Show accs in first bank:");
     bank.accounts()
         .unwrap()
@@ -64,8 +57,9 @@ fn main() {
         .for_each(|acc| println!("Acc: {acc}"));
     println!("----------------------------");
 
-    bank_sec = Bank::restore_accounts_from_transactions(bank.transactions().unwrap(), Some(tr_fee))
-        .unwrap();
+    let bank_sec: Bank<MemAccountStorage, MemTransactionStorage> =
+        Bank::restore_accounts_from_transactions(bank.transactions().unwrap(), Some(tr_fee))
+            .unwrap();
     println!("Show accs in sec bank after restore:");
     bank_sec
         .accounts()

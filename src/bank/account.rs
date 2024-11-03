@@ -5,10 +5,7 @@ use crate::bank::storage::{
 };
 use thiserror::Error as TError;
 
-use super::{
-    storage::Error as StorageError,
-    transactions::Transaction,
-};
+use super::{storage::Error as StorageError, transactions::Transaction};
 
 #[derive(Debug, Default)]
 pub struct Account {
@@ -205,8 +202,11 @@ impl Account {
         trs: Vec<Transaction>,
         acc_storage: &mut S,
     ) -> Result<Account, Error> {
-        let mut acc = Account { name: account_name, trs: trs.iter().map(|tr| tr.id).collect(), ..Default::default() };
-        
+        let mut acc = Account {
+            name: account_name,
+            trs: trs.iter().map(|tr| tr.id).collect(),
+            ..Default::default()
+        };
 
         for tr in trs {
             match tr.action {
