@@ -3,13 +3,18 @@
 version = 3
 
 [[package]]
-name = "bank_actions"
+name = "bank_core"
 version = "0.1.0"
+dependencies = [
+ "serde",
+ "thiserror",
+]
 
 [[package]]
 name = "bank_protocol"
 version = "0.1.0"
 dependencies = [
+ "bank_core",
  "serde",
  "serde_json",
  "uuid",
@@ -19,7 +24,7 @@ dependencies = [
 name = "bank_server"
 version = "0.1.0"
 dependencies = [
- "bank_actions",
+ "bank_core",
  "bank_protocol",
  "serde",
  "serde_json",
@@ -83,6 +88,7 @@ dependencies = [
 name = "rust_bank"
 version = "0.1.0"
 dependencies = [
+ "bank_core",
  "bank_protocol",
  "bank_server",
 ]
@@ -127,13 +133,33 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "2.0.85"
+version = "2.0.87"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5023162dfcd14ef8f32034d8bcd4cc5ddc61ef7a247c024a33e24e1f24d21b56"
+checksum = "25aa4ce346d03a6dcd68dd8b4010bcb74e54e62c90c573f394c46eae99aba32d"
 dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
+]
+
+[[package]]
+name = "thiserror"
+version = "1.0.66"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5d171f59dbaa811dbbb1aee1e73db92ec2b122911a48e1390dfe327a821ddede"
+dependencies = [
+ "thiserror-impl",
+]
+
+[[package]]
+name = "thiserror-impl"
+version = "1.0.66"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b08be0f17bd307950653ce45db00cd31200d82b624b36e181337d9c7d92765b5"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

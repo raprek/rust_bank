@@ -1,4 +1,5 @@
 use std::fmt::Display;
+use serde::{Deserialize, Serialize};
 use thiserror::Error as TError;
 
 // data between database and Model
@@ -9,7 +10,7 @@ pub struct AccountTransfer {
     pub trs: Vec<usize>,
 }
 
-#[derive(Debug, PartialEq, Default)]
+#[derive(Debug, PartialEq, Default, Serialize, Deserialize)]
 pub enum TransactionAction {
     #[default]
     Registration,

@@ -37,6 +37,12 @@ impl<A: AccountStorage + Default, T: TransactionStorage + Default> Bank<A, T> {
         Account::new(account_name, &mut self.acc_storage, &mut self.tr_storage)
     }
 
+    pub fn get_acc(&mut self, account_name: String) -> Result<Account, AccError> {
+        Ok(
+            Account::from(self.acc_storage.get_account(account_name)?)
+        )
+    }
+
     pub fn inc_acc_balance(&mut self, acc: &mut Account, value: usize) -> Result<usize, AccError> {
         Ok(acc
             .inc_balance(value, &mut self.acc_storage, &mut self.tr_storage)?
@@ -96,7 +102,7 @@ impl<A: AccountStorage + Default, T: TransactionStorage + Default> Bank<A, T> {
         Ok(Transaction::from(self.tr_storage.transaction_by_id(id)?))
     }
 
-    pub fn restore_accounts_from_transactions(
+    pub fn restore_bank_from_transactions(
         trs: Vec<Transaction>,
         tr_fee: Option<usize>,
     ) -> Result<Bank<A, T>, AccError> {
