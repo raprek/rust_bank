@@ -141,7 +141,7 @@ impl<A: AccountStorage + Default, T: TransactionStorage + Default> Bank<A, T> {
         Ok(accs)
     }
 
-    pub fn account(&mut self, account_name: String) -> Result<Account, Error> {
+    pub fn account(&self, account_name: String) -> Result<Account, Error> {
         Ok(Account::from(self.acc_storage.get_account(account_name)?))
     }
 
@@ -345,5 +345,10 @@ impl<A: AccountStorage + Default, T: TransactionStorage + Default> Bank<A, T> {
         }
 
         Ok(bank)
+    }
+
+    pub fn account_balance(&self, account_name: String) -> Result<usize, Error> {
+        let acc = self.account(account_name)?;
+        Ok(acc.balance)
     }
 }

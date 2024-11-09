@@ -5,11 +5,11 @@ use bank_core::bank::{
     Account, Bank, Transaction,
 };
 use bank_protocol::types::{
-    Request, RequestAccountTransactionsPayload, RequestCreateAccountPayload,
+    Request, RequestAccountTransactionsPayload, RequestBalancePayload, RequestCreateAccountPayload,
     RequestDecrBalancePayload, RequestIncrBalancePayload, RequestMakeTransactionPayload,
-    RequestTransactionByIdPayload, Response, ResponseAccountPayload, ResponseErrorPayload,
-    ResponseSerializer, ResponseShortTrPayload, ResponseTrPayload, ResponseTrsPayload,
-    TransactionActionSerializer, TransactionSerializer,
+    RequestTransactionByIdPayload, Response, ResponseAccountPayload, ResponseBalancePayload,
+    ResponseErrorPayload, ResponseSerializer, ResponseShortTrPayload, ResponseTrPayload,
+    ResponseTrsPayload, TransactionActionSerializer, TransactionSerializer,
 };
 use serde_json::Value;
 
@@ -144,6 +144,21 @@ impl<A: AccountStorage + Default, T: TransactionStorage + Default> Handler<A, T>
                     ),
                 }
             }
+            bank_protocol::types::Method::AccountBalance => {
+                match self.handler_account_balance(req) {
+                    Ok(balance) => serde_json::to_writer(
+                        &stream,
+                        &ResponseSerializer::from(Response::ok(
+                            req_id,
+                            Some(ResponseBalancePayload { balance }),
+                        )),
+                    ),
+                    Err(err) => serde_json::to_writer(
+                        &stream,
+                        &ResponseSerializer::from(err.to_response(req_id)),
+                    ),
+                }
+            }
         };
         stream.write_all(b"\n")?;
         Ok(())
@@ -235,5 +250,16 @@ impl<A: AccountStorage + Default, T: TransactionStorage + Default> Handler<A, T>
             .into_iter()
             .map(|tr| TransactionSerializer::from(Tr(tr)))
             .collect())
+    }
+
+    fn handler_account_balance(
+        &mut self,
+        req: Request<Value>,
+    ) -> Result<usize, ResponseErrorPayload> {
+        let payload = match serde_json::from_value::<RequestBalancePayload>(req.payload) {
+            Ok(payload) => payload,
+            Err(_) => return Err(ResponseErrorPayload::invalid_format()),
+        };
+        Ok(self.bank.account_balance(payload.account_name)?)
     }
 }

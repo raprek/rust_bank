@@ -62,5 +62,11 @@ fn main() {
         Err(err) => println!("Error getting transaction, error: {:?}", err),
     }
 
+    println!("Get account balance. Acc name: test_acc");
+    match client.account_balance("test_acc".to_owned()) {
+        Ok(trs) => println!("Account balance {:?}", trs),
+        Err(err) => println!("Error getting acc balance, error: {:?}", err),
+    }
+
     //
 }

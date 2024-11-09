@@ -3,11 +3,12 @@ use std::time::Duration;
 use std::{io::Write, net::TcpStream, vec::Vec};
 
 use bank_protocol::types::{
-    Method, Request, RequestAccountTransactionsPayload, RequestCreateAccountPayload,
-    RequestDecrBalancePayload, RequestIncrBalancePayload, RequestMakeTransactionPayload,
-    RequestSerializer, RequestTransactionByIdPayload, RequestTransactionsPayload, Response,
-    ResponseAccountPayload, ResponseErrorPayload, ResponseSerializer, ResponseShortTrPayload,
-    ResponseTrPayload, ResponseTrsPayload, TransactionSerializer,
+    Method, Request, RequestAccountTransactionsPayload, RequestBalancePayload,
+    RequestCreateAccountPayload, RequestDecrBalancePayload, RequestIncrBalancePayload,
+    RequestMakeTransactionPayload, RequestSerializer, RequestTransactionByIdPayload,
+    RequestTransactionsPayload, Response, ResponseAccountPayload, ResponseBalancePayload,
+    ResponseErrorPayload, ResponseSerializer, ResponseShortTrPayload, ResponseTrPayload,
+    ResponseTrsPayload, TransactionSerializer,
 };
 use serde::Serialize;
 use serde_json::Value;
@@ -270,6 +271,25 @@ impl Client {
             bank_protocol::types::RespCode::OK => {
                 let payload: ResponseTrsPayload = serde_json::from_value(resp.payload.unwrap())?;
                 Ok(payload.trs.into_iter().map(Transaction::from).collect())
+            }
+            bank_protocol::types::RespCode::ERR => {
+                let payload: ResponseErrorPayload = serde_json::from_value(resp.payload.unwrap())?;
+                Err(Error::ServerError(payload.error))
+            }
+        }
+    }
+
+    pub fn account_balance(&self, account_name: String) -> Result<usize, Error> {
+        let req = Request::new(
+            Method::AccountBalance,
+            RequestBalancePayload { account_name },
+        );
+        let resp = self.send_request(req)?;
+        match resp.code {
+            bank_protocol::types::RespCode::OK => {
+                let payload: ResponseBalancePayload =
+                    serde_json::from_value(resp.payload.unwrap())?;
+                Ok(payload.balance)
             }
             bank_protocol::types::RespCode::ERR => {
                 let payload: ResponseErrorPayload = serde_json::from_value(resp.payload.unwrap())?;

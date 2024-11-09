@@ -399,8 +399,8 @@ mod tests {
             .filter(|x| x.account_name == target_name)
             .collect::<Vec<Transaction>>();
 
-        assert_eq!(trs.len(), 1);
-        assert_eq!(trs[0].action, TransactionAction::Registration)
+        assert_eq!(trs.len(), 2);
+        assert_eq!(trs[1].action, TransactionAction::Registration)
     }
 
     #[test]

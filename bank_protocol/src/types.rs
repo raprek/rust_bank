@@ -36,6 +36,7 @@ pub enum Method {
     Transaction,
     Transactions,
     AccountTransactions,
+    AccountBalance,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -100,6 +101,11 @@ pub struct ResponseTrPayload {
 }
 
 #[derive(Serialize, Deserialize)]
+pub struct ResponseBalancePayload {
+    pub balance: usize,
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct RequestCreateAccountPayload {
     pub account_name: String,
 }
@@ -134,6 +140,11 @@ pub struct RequestTransactionByIdPayload {
 
 #[derive(Serialize, Deserialize)]
 pub struct RequestAccountTransactionsPayload {
+    pub account_name: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct RequestBalancePayload {
     pub account_name: String,
 }
 
