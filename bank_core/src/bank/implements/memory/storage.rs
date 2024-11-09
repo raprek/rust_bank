@@ -155,7 +155,7 @@ mod tests {
         let test_name = "test".to_string();
 
         // test empty get
-        assert_eq!(storage.get_account(test_name.clone()).is_err(), true);
+        assert!(storage.get_account(test_name.clone()).is_err());
 
         // test success insert
         let raw = AccountTransfer {
@@ -163,7 +163,7 @@ mod tests {
             balance: 0,
             trs: Default::default(),
         };
-        assert_eq!(storage.create_account(raw).is_ok(), true);
+        assert!(storage.create_account(raw).is_ok());
 
         let result = storage.get_account(test_name.clone());
         assert_eq!(
@@ -183,7 +183,7 @@ mod tests {
             balance: 0,
             trs: Default::default(),
         };
-        assert_eq!(storage.create_account(raw).is_ok(), true);
+        assert!(storage.create_account(raw).is_ok());
 
         // test create acc with same name
         raw = AccountTransfer {
@@ -192,7 +192,7 @@ mod tests {
             trs: Default::default(),
         };
         let result = storage.create_account(raw);
-        assert_eq!(result.is_err(), true);
+        assert!(result.is_err());
         assert_eq!(result.err().unwrap(), StorageError::AccountAlreadyExists);
     }
 
@@ -208,7 +208,7 @@ mod tests {
             trs: Default::default(),
         };
         let result = storage.update_account(raw);
-        assert_eq!(result.is_err(), true);
+        assert!(result.is_err());
         assert_eq!(result.err().unwrap(), StorageError::AccountNotExists);
 
         // test add new acc (not existed early)
@@ -225,7 +225,7 @@ mod tests {
             trs: Default::default(),
         };
         let res = storage.update_account(to_update);
-        assert_eq!(res.is_ok(), true);
+        assert!(res.is_ok());
         assert_eq!(res.unwrap().balance, 123);
     }
 
@@ -373,7 +373,7 @@ mod tests {
             TransactionAction::Add(15)
         );
 
-        assert_eq!(storage.transaction_by_id(4).is_err(), true);
+        assert!(storage.transaction_by_id(4).is_err());
     }
 
     #[test]
@@ -385,11 +385,11 @@ mod tests {
 
         // test create account with new name
         let mut acc = bank.create_account(target_name.clone());
-        assert_eq!(acc.is_ok(), true);
+        assert!(acc.is_ok());
 
         // test error to create acc with same name
         acc = bank.create_account(target_name.clone());
-        assert_eq!(acc.is_err(), true);
+        assert!(acc.is_err());
 
         // test transactions
         let trs = bank

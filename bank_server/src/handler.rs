@@ -51,7 +51,7 @@ impl<A: AccountStorage + Default, T: TransactionStorage + Default> Handler<A, T>
         let _ = match req.method {
             bank_protocol::types::Method::CreteAccount => match self.handle_create_account(req) {
                 Ok(acc) => {
-                    let payload = ResponseAccountPayload::from(acc);
+                    let payload = acc;
                     serde_json::to_writer(
                         &stream,
                         &ResponseSerializer::from(Response::<ResponseAccountPayload>::ok(
@@ -145,8 +145,7 @@ impl<A: AccountStorage + Default, T: TransactionStorage + Default> Handler<A, T>
                 }
             }
         };
-        stream.write(b"\n")?;
-        stream.flush()?;
+        stream.write_all(b"\n")?;
         Ok(())
     }
 

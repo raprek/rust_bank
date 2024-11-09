@@ -1,6 +1,5 @@
 use bank_core::bank::{
     implements::memory::storage::{MemAccountStorage, MemTransactionStorage},
-    storage::AccountStorage,
     Bank,
 };
 use bank_server::{handler::Handler, server::Server};

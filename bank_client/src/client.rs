@@ -1,5 +1,4 @@
-use std::fmt::Display;
-use std::io::{BufRead, BufReader, Read};
+use std::io::{BufRead, BufReader};
 use std::time::Duration;
 use std::{io::Write, net::TcpStream, vec::Vec};
 
@@ -10,7 +9,7 @@ use bank_protocol::types::{
     ResponseAccountPayload, ResponseErrorPayload, ResponseSerializer, ResponseShortTrPayload,
     ResponseTrPayload, ResponseTrsPayload, TransactionSerializer,
 };
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::Value;
 
 pub struct Client {
@@ -122,8 +121,7 @@ impl Client {
 
         // write resp
         serde_json::to_writer(&stream, &RequestSerializer::from(req))?;
-        stream.write(b"\n")?;
-        stream.flush()?;
+        stream.write_all(b"\n")?;
 
         // wait resp
         let buf_reader = BufReader::new(&mut stream);
@@ -135,7 +133,7 @@ impl Client {
 
         Ok(Response::try_from(serde_json::from_str::<
             ResponseSerializer<Value>,
-        >(&res.as_str())?)?)
+        >(res.as_str())?)?)
     }
 
     pub fn create_account(&self, account_name: String) -> Result<Account, Error> {

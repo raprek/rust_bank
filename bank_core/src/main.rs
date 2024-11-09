@@ -14,7 +14,7 @@ fn main() {
     );
 
     // create acc
-    let mut acc = bank.create_account("some_acc".to_string()).unwrap();
+    let acc = bank.create_account("some_acc".to_string()).unwrap();
     println!("Created an account: {acc}");
 
     // incr balance | balance 10
@@ -25,7 +25,7 @@ fn main() {
     let _ = bank.decr_acc_balance(acc.name.clone(), 2);
     println!("Account after decrement balance on 2: {acc}");
 
-    let mut to_acc = bank.create_account("to_acc".to_string()).unwrap();
+    let to_acc = bank.create_account("to_acc".to_string()).unwrap();
 
     let tr_amount = 3;
     println!(

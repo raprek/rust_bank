@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use bank_client::client::{self, Client};
+use bank_client::client::Client;
 
 fn main() {
     let client = Client::new("127.0.0.1:8080".to_string(), Duration::from_secs(30));

@@ -38,7 +38,7 @@ impl<A: AccountStorage + Default, T: TransactionStorage + Default> Server<A, T> 
         timeout: Option<Duration>,
     ) -> Self {
         Self {
-            handler: handler,
+            handler,
             host: host.unwrap_or("127.0.0.1".to_string()),
             port: port.unwrap_or(8080),
             timeout,

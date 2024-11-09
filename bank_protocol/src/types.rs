@@ -142,7 +142,7 @@ impl Response<ResponseErrorPayload> {
         Response {
             id: req_id,
             code: RespCode::ERR,
-            payload: Some(ResponseErrorPayload { error: error }),
+            payload: Some(ResponseErrorPayload { error }),
         }
     }
 }
@@ -176,7 +176,7 @@ impl<P: Serialize> Response<P> {
         Response {
             id: req_id,
             code: RespCode::OK,
-            payload: payload,
+            payload,
         }
     }
 
@@ -184,7 +184,7 @@ impl<P: Serialize> Response<P> {
         Response {
             id: req_id,
             code: RespCode::ERR,
-            payload: payload,
+            payload,
         }
     }
 }
@@ -245,8 +245,8 @@ impl<P: Serialize> Request<P> {
     pub fn new(method: Method, payload: P) -> Self {
         Self {
             id: Uuid::new_v4(),
-            method: method,
-            payload: payload,
+            method,
+            payload,
         }
     }
 }
