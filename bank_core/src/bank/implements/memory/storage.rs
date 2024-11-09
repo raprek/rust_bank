@@ -144,9 +144,8 @@ impl TransactionStorage for MemTransactionStorage {
 #[cfg(test)]
 mod tests {
 
-    use crate::bank::account::{Account, Error as AccError};
     use crate::bank::storage::Error as StorageError;
-    use crate::bank::transactions::Transaction;
+    use crate::bank::{Bank, Error as BankError, Transaction};
 
     use super::*;
 
@@ -378,96 +377,94 @@ mod tests {
     }
 
     #[test]
-    fn test_account_new() {
-        let mut acc_storage = MemAccountStorage::new().unwrap();
-        let mut tr_storage = MemTransactionStorage::new();
+    fn test_bank_create_acc() {
+        let acc_storage = MemAccountStorage::new().unwrap();
+        let tr_storage = MemTransactionStorage::new();
+        let mut bank = Bank::new(acc_storage, tr_storage, Some(0));
         let target_name = "test".to_string();
 
         // test create account with new name
-        let mut acc = Account::new(target_name.clone(), &mut acc_storage, &mut tr_storage);
+        let mut acc = bank.create_account(target_name.clone());
         assert_eq!(acc.is_ok(), true);
 
         // test error to create acc with same name
-        acc = Account::new(target_name.clone(), &mut acc_storage, &mut tr_storage);
+        acc = bank.create_account(target_name.clone());
         assert_eq!(acc.is_err(), true);
 
         // test transactions
-        let trs = tr_storage
+        let trs = bank
             .transactions()
             .unwrap()
             .into_iter()
             .filter(|x| x.account_name == target_name)
-            .collect::<Vec<TransactionTransfer>>();
+            .collect::<Vec<Transaction>>();
 
         assert_eq!(trs.len(), 1);
         assert_eq!(trs[0].action, TransactionAction::Registration)
     }
 
     #[test]
-    fn test_account_inc_balance() {
-        let mut acc_storage = MemAccountStorage::new().unwrap();
-        let mut tr_storage = MemTransactionStorage::new();
+    fn test_bank_account_inc_balance() {
+        let acc_storage = MemAccountStorage::new().unwrap();
+        let tr_storage = MemTransactionStorage::new();
+        let mut bank = Bank::new(acc_storage, tr_storage, Some(0));
         let target_name = "test".to_string();
 
-        let mut acc = Account::new(target_name.clone(), &mut acc_storage, &mut tr_storage).unwrap();
-        let _ = acc
-            .inc_balance(10, &mut acc_storage, &mut tr_storage)
-            .unwrap();
-        assert_eq!(acc.balance(), 10);
+        let _ = bank.create_account(target_name.clone());
+        let _ = bank.inc_acc_balance(target_name.clone(), 10).unwrap();
+        let acc = bank.account(target_name.clone()).unwrap();
+        assert_eq!(acc.balance, 10);
 
         assert_eq!(
-            acc.inc_balance(0, &mut acc_storage, &mut tr_storage)
-                .err()
-                .unwrap(),
-            AccError::EmptyTransaction
+            bank.inc_acc_balance(target_name.clone(), 0).err().unwrap(),
+            BankError::EmptyTransaction
         );
     }
 
     #[test]
-    fn test_account_decr_balance() {
-        let mut acc_storage = MemAccountStorage::new().unwrap();
-        let mut tr_storage = MemTransactionStorage::new();
+    fn test_bank_account_decr_balance() {
+        let acc_storage = MemAccountStorage::new().unwrap();
+        let tr_storage = MemTransactionStorage::new();
+        let mut bank = Bank::new(acc_storage, tr_storage, Some(0));
         let target_name = "test".to_string();
-        let mut acc = Account::new(target_name.clone(), &mut acc_storage, &mut tr_storage).unwrap();
-        acc.inc_balance(100, &mut acc_storage, &mut tr_storage)
-            .unwrap();
-        let tr = acc
-            .decr_balance(10, &mut acc_storage, &mut tr_storage)
-            .unwrap();
-        assert_eq!(acc.balance(), 90);
 
-        let trs = tr_storage
+        let _ = bank.create_account(target_name.clone()).unwrap();
+        bank.inc_acc_balance(target_name.clone(), 100).unwrap();
+        let _ = bank.decr_acc_balance(target_name.clone(), 10).unwrap();
+
+        let acc = bank.account(target_name.clone()).unwrap();
+        assert_eq!(acc.balance, 90);
+
+        let trs = bank
             .transactions()
             .unwrap()
             .into_iter()
             .filter(|x| x.account_name == "test")
-            .collect::<Vec<TransactionTransfer>>();
+            .collect::<Vec<Transaction>>();
 
         assert_eq!(trs.len(), 3);
         assert_eq!(trs[2].action, TransactionAction::Withdraw(10));
-        assert_eq!(tr, Transaction::from(trs[2].clone()));
     }
 
     #[test]
     fn test_account_transaction() {
-        let mut acc_storage = MemAccountStorage::new().unwrap();
-        let mut tr_storage = MemTransactionStorage::new();
-        let mut acc_f =
-            Account::new("person_1".to_owned(), &mut acc_storage, &mut tr_storage).unwrap();
-        let mut acc_s =
-            Account::new("person_2".to_owned(), &mut acc_storage, &mut tr_storage).unwrap();
+        let acc_storage = MemAccountStorage::new().unwrap();
+        let tr_storage = MemTransactionStorage::new();
+        let mut bank = Bank::new(acc_storage, tr_storage, Some(0));
 
-        let _ = acc_f
-            .inc_balance(100, &mut acc_storage, &mut tr_storage)
-            .unwrap();
-        let tr = acc_f
-            .make_transaction(10, &mut acc_s, None, &mut acc_storage, &mut tr_storage)
-            .unwrap();
-        assert_eq!(acc_f.balance(), 90);
-        assert_eq!(acc_s.balance(), 10);
+        let _acc_f = bank.create_account("person_1".to_owned()).unwrap();
+        let _acc_s = bank.create_account("person_2".to_owned()).unwrap();
 
-        let tr_t = tr_storage.transaction_by_id(tr.id).unwrap();
-        assert_eq!(Transaction::from(tr_t.clone()), tr);
+        let _ = bank.inc_acc_balance("person_1".to_owned(), 100).unwrap();
+        let tr_id = bank
+            .make_transaction("person_1".to_owned(), "person_2".to_owned(), 10)
+            .unwrap();
+        let acc_f = bank.account("person_1".to_owned()).unwrap();
+        let acc_s = bank.account("person_2".to_owned()).unwrap();
+        assert_eq!(acc_f.balance, 90);
+        assert_eq!(acc_s.balance, 10);
+
+        let tr_t = bank.transaction_by_id(tr_id).unwrap();
         assert_eq!(
             tr_t.action,
             TransactionAction::Transfer {
@@ -477,57 +474,54 @@ mod tests {
             }
         );
 
-        assert_eq!(acc_storage.fee_account().unwrap().balance, 0);
+        assert_eq!(bank.acc_storage.fee_account().unwrap().balance, 0);
+
+        let _ = bank
+            .make_transaction("person_1".to_owned(), "person_2".to_owned(), 10)
+            .unwrap();
+        let acc_f = bank.account("person_1".to_owned()).unwrap();
 
         // tr with fees
-        let _ = acc_f
-            .make_transaction(10, &mut acc_s, Some(10), &mut acc_storage, &mut tr_storage)
-            .unwrap();
-        assert_eq!(acc_f.balance(), 70);
-        assert_eq!(acc_storage.fee_account().unwrap().balance, 10);
+        assert_eq!(acc_f.balance, 80);
     }
 
     #[test]
     fn test_account_restore() {
-        let mut acc_storage = MemAccountStorage::new().unwrap();
-        let mut tr_storage = MemTransactionStorage::new();
-        let acc_name = "person_1".to_owned();
-        let mut acc_f = Account::new(acc_name.clone(), &mut acc_storage, &mut tr_storage).unwrap();
+        let acc_storage = MemAccountStorage::new().unwrap();
+        let tr_storage = MemTransactionStorage::new();
+        let mut bank = Bank::new(acc_storage, tr_storage, Some(0));
+        let account_name = "person_1".to_owned();
         let mut trs = Vec::new();
-        trs.push(
-            acc_f
-                .inc_balance(10, &mut acc_storage, &mut tr_storage)
-                .unwrap(),
-        );
-        trs.push(
-            acc_f
-                .decr_balance(5, &mut acc_storage, &mut tr_storage)
-                .unwrap(),
-        );
-        trs.push(
-            acc_f
-                .inc_balance(1, &mut acc_storage, &mut tr_storage)
-                .unwrap(),
-        );
-        trs.push(
-            acc_f
-                .inc_balance(20, &mut acc_storage, &mut tr_storage)
-                .unwrap(),
-        );
-
-        let _ = acc_storage.update_account(AccountTransfer {
-            name: "person_1".to_owned(),
-            balance: 0,
-            trs: Default::default(),
+        trs.push(Transaction {
+            id: 1,
+            action: TransactionAction::Registration,
+            account_name: account_name.clone(),
+        });
+        trs.push(Transaction {
+            id: 2,
+            action: TransactionAction::Add(10),
+            account_name: account_name.clone(),
+        });
+        trs.push(Transaction {
+            id: 3,
+            action: TransactionAction::Withdraw(5),
+            account_name: account_name.clone(),
+        });
+        trs.push(Transaction {
+            id: 4,
+            action: TransactionAction::Add(1),
+            account_name: account_name.clone(),
+        });
+        trs.push(Transaction {
+            id: 4,
+            action: TransactionAction::Add(20),
+            account_name: account_name.clone(),
         });
 
         // test account exists
-        let res = Account::from_transactions(acc_name.clone(), trs.clone(), &mut acc_storage);
-        assert_eq!(res.unwrap().balance(), 26);
-
-        // test transactions for account not existed
-        let res =
-            Account::from_transactions("not_exists".to_owned(), trs.clone(), &mut acc_storage);
-        assert_eq!(res.is_ok(), true);
+        let res = bank
+            .restore_account_from_transactions(account_name.clone(), trs)
+            .unwrap();
+        assert_eq!(res.balance, 26);
     }
 }

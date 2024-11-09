@@ -4,3 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+bank_protocol = { path = "../bank_protocol" }
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+uuid = { version = "1.11.0", features = ["v4"] }
+thiserror = "2.0.1"

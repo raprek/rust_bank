@@ -1,4 +1,4 @@
-use rust_bank::bank::{
+use bank_core::bank::{
     implements::memory::storage::{MemAccountStorage, MemTransactionStorage},
     Bank,
 };
@@ -18,11 +18,11 @@ fn main() {
     println!("Created an account: {acc}");
 
     // incr balance | balance 10
-    let _ = bank.inc_acc_balance(&mut acc, 10);
+    let _ = bank.inc_acc_balance(acc.name.clone(), 10);
     println!("Account after increment on 10: {acc}");
 
     // decr balance | balance 8
-    let _ = bank.decr_acc_balance(&mut acc, 2);
+    let _ = bank.decr_acc_balance(acc.name.clone(), 2);
     println!("Account after decrement balance on 2: {acc}");
 
     let mut to_acc = bank.create_account("to_acc".to_string()).unwrap();
@@ -32,7 +32,7 @@ fn main() {
         "Before transaction. Fee: {tr_fee}. Amount: {tr_amount} Account from: {acc}, to {to_acc}"
     );
     // balance acc 8 - 4 = 3
-    let _ = bank.make_transaction(&mut acc, &mut to_acc, tr_amount);
+    let _ = bank.make_transaction(acc.name.clone(), to_acc.name.clone(), tr_amount);
     println!(
         "After transaction. Fee: {tr_fee}. Amount: {tr_amount} Account from: {acc}, to {to_acc}"
     );
@@ -58,8 +58,7 @@ fn main() {
     println!("----------------------------");
 
     let bank_sec: Bank<MemAccountStorage, MemTransactionStorage> =
-        Bank::restore_accounts_from_transactions(bank.transactions().unwrap(), Some(tr_fee))
-            .unwrap();
+        Bank::restore_bank_from_transactions(bank.transactions().unwrap(), Some(tr_fee)).unwrap();
     println!("Show accs in sec bank after restore:");
     bank_sec
         .accounts()

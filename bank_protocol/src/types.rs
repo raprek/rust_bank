@@ -1,107 +1,119 @@
-use bank_core::bank::transactions::Transaction;
-use serde::{ Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+#[derive(Debug, Serialize, Deserialize)]
+pub enum TransactionActionSerializer {
+    Registration,
+    Add(usize),
+    Withdraw(usize),
+    Transfer {
+        to: String, // account id
+        value: usize,
+        fee: usize,
+    },
+}
 
-#[derive(Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TransactionSerializer {
+    pub id: usize,
+    pub action: TransactionActionSerializer,
+    pub account_name: String,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct AccountSerializer {
+    pub balance: usize,
+    pub name: String,
+    pub trs: Vec<usize>,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum Method {
     CreteAccount,
     IncrBalance,
     DecrBalance,
     MakeTransaction,
-    Transactions,
     Transaction,
-    AccountTransactions
+    Transactions,
+    AccountTransactions,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum RespCode {
     OK,
     ERR,
 }
 
+#[derive(Debug)]
 pub struct Request<P: Serialize> {
     pub id: Uuid,
     pub method: Method,
-    pub payload: P
+    pub payload: P,
 }
 
-
+#[derive(Debug)]
 pub struct Response<P: Serialize> {
     pub id: Uuid,
     pub code: RespCode,
-    pub payload: Option<P>
+    pub payload: Option<P>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ResponseSerializer<P: Serialize> {
-    id: String,
-    code: RespCode,
-    payload: Option<P>
+    pub id: String,
+    pub code: RespCode,
+    pub payload: Option<P>,
 }
 
-
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct RequestSerializer<P: Serialize> {
     pub id: String,
     pub method: Method,
-    pub payload: P
-
+    pub payload: P,
 }
-
 
 #[derive(Serialize, Deserialize)]
 pub struct ResponseErrorPayload {
-    pub error: String
+    pub error: String,
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct ResponseIncrBalancePayload {
-    pub id: usize
+pub struct ResponseAccountPayload {
+    pub balance: usize,
+    pub name: String,
+    pub trs: Vec<usize>,
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct ResponseDecrBalancePayload {
-    pub id: usize
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct ResponseMakeTrPayload {
-    pub id: usize
+pub struct ResponseShortTrPayload {
+    pub id: usize,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct ResponseTrsPayload {
-    pub trs: Vec<Transaction>
+    pub trs: Vec<TransactionSerializer>,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct ResponseTrPayload {
-    pub tr: Transaction
+    pub tr: TransactionSerializer,
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct ResponseOkTransactionPayload {
-    pub transaction_id: usize
-}
-
-
-
-#[derive(Deserialize)]
 pub struct RequestCreateAccountPayload {
-    pub account_name: String
+    pub account_name: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct RequestIncrBalancePayload {
     pub account_name: String,
-    pub value: usize
+    pub value: usize,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct RequestDecrBalancePayload {
     pub account_name: String,
-    pub value: usize
+    pub value: usize,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -109,128 +121,152 @@ pub struct RequestMakeTransactionPayload {
     pub account_name: String,
     pub account_to_name: String,
     pub value: usize,
-    pub fee_amount: Option<usize>
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct RequestAccountTransactionsPayload  {
-    pub account_name: String,
 }
 
 // todo delete in future
 #[derive(Serialize, Deserialize)]
-pub struct RequestTransactionsPayload {
-}
+pub struct RequestTransactionsPayload {}
 
 #[derive(Serialize, Deserialize)]
 pub struct RequestTransactionByIdPayload {
     pub id: usize,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct RequestAccountTransactionsPayload {
+    pub account_name: String,
+}
 
 impl Response<ResponseErrorPayload> {
     pub fn new(req_id: Uuid, error: String) -> Self {
-        Response{
+        Response {
             id: req_id,
             code: RespCode::ERR,
-            payload: Some(ResponseErrorPayload{error: error})
+            payload: Some(ResponseErrorPayload { error: error }),
         }
-
     }
 }
 
 impl ResponseErrorPayload {
-    pub fn invalid_format()  -> ResponseErrorPayload {
-        ResponseErrorPayload{error: "InvalidFormat".to_string()}
+    pub fn invalid_format() -> ResponseErrorPayload {
+        ResponseErrorPayload {
+            error: "InvalidFormat".to_string(),
+        }
     }
 
     pub fn to_response(self, req_id: Uuid) -> Response<Self> {
-        Response{
+        Response {
             id: req_id,
             code: RespCode::ERR,
-            payload: Some(self)
+            payload: Some(self),
         }
     }
 }
 
-impl <E: ToString>From<E> for ResponseErrorPayload {
+impl<E: ToString> From<E> for ResponseErrorPayload {
     fn from(value: E) -> Self {
-        ResponseErrorPayload{error: value.to_string()}
+        ResponseErrorPayload {
+            error: value.to_string(),
+        }
     }
 }
 
-impl <P: Serialize>Response<P> {
+impl<P: Serialize> Response<P> {
     pub fn ok(req_id: Uuid, payload: Option<P>) -> Self {
-        Response{
+        Response {
             id: req_id,
             code: RespCode::OK,
-            payload: payload
+            payload: payload,
         }
-
     }
 
     pub fn err(req_id: Uuid, payload: Option<P>) -> Self {
-        Response{
+        Response {
             id: req_id,
             code: RespCode::ERR,
-            payload: payload
+            payload: payload,
         }
-
     }
 }
 
-impl <P: Serialize>TryFrom<ResponseSerializer<P>> for  Response<P>{
-    type Error = String;
+impl<P: Serialize> TryFrom<ResponseSerializer<P>> for Response<P> {
+    type Error = uuid::Error;
 
     fn try_from(value: ResponseSerializer<P>) -> Result<Self, Self::Error> {
-        let uuid = match  Uuid::parse_str(value.id.as_str()){
+        let uuid = match Uuid::parse_str(value.id.as_str()) {
             Ok(uuid) => uuid,
-            Err(err) => return Err(err.to_string()),
+            Err(err) => return Err(err),
         };
-        Ok(Response{
+        Ok(Response {
             id: uuid,
             payload: value.payload,
-            code: value.code
+            code: value.code,
         })
     }
 }
 
-impl <P: Serialize>From<Request<P>> for RequestSerializer<P> {
+impl<P: Serialize> From<Request<P>> for RequestSerializer<P> {
     fn from(value: Request<P>) -> Self {
-        RequestSerializer{
+        RequestSerializer {
             id: value.id.to_string(),
             method: value.method,
-            payload: value.payload
+            payload: value.payload,
         }
     }
 }
 
-
-impl <P: Serialize>TryFrom<RequestSerializer<P>> for  Request<P>{
-    type Error = String;
+impl<P: Serialize> TryFrom<RequestSerializer<P>> for Request<P> {
+    type Error = uuid::Error;
 
     fn try_from(value: RequestSerializer<P>) -> Result<Self, Self::Error> {
-        let uuid = match  Uuid::parse_str(value.id.as_str()){
+        let uuid = match Uuid::parse_str(value.id.as_str()) {
             Ok(uuid) => uuid,
-            Err(err) => return Err(err.to_string()),
+            Err(err) => return Err(err),
         };
-        Ok(Request{
+        Ok(Request {
             id: uuid,
             method: value.method,
-            payload: value.payload
+            payload: value.payload,
         })
     }
 }
 
-impl <P: Serialize>From<Response<P>> for ResponseSerializer<P> {
+impl<P: Serialize> From<Response<P>> for ResponseSerializer<P> {
     fn from(value: Response<P>) -> Self {
-        ResponseSerializer{
+        ResponseSerializer {
             id: value.id.to_string(),
             payload: value.payload,
-            code: value.code
+            code: value.code,
         }
     }
 }
 
+impl<P: Serialize> Request<P> {
+    pub fn new(method: Method, payload: P) -> Self {
+        Self {
+            id: Uuid::new_v4(),
+            method: method,
+            payload: payload,
+        }
+    }
+}
 
+impl From<ResponseAccountPayload> for AccountSerializer {
+    fn from(value: ResponseAccountPayload) -> Self {
+        AccountSerializer {
+            balance: value.balance,
+            name: value.name,
+            trs: value.trs,
+        }
+    }
+}
 
+impl From<AccountSerializer> for ResponseAccountPayload {
+    fn from(value: AccountSerializer) -> Self {
+        ResponseAccountPayload {
+            balance: value.balance,
+            name: value.name,
+            trs: value.trs,
+        }
+    }
+}

@@ -1,10 +1,10 @@
-[package]
-name = "rust_bank"
-version = "0.1.0"
-edition = "2021"
+[workspace]
+resolver = "2"
 
-[dependencies]
-bank_protocol = { path = "./bank_protocol" }
-bank_server = { path = "./bank_server" }
-bank_core = { path = "./bank_core" }
+
+members = [
+    "bank_client",
+    "bank_server",
+    "bank_protocol", "server", "client",
+]
 
