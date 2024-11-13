@@ -124,16 +124,17 @@ impl Client {
         serde_json::to_writer(&stream, &RequestSerializer::from(req))?;
         stream.write_all(b"\n")?;
 
+        let mut res = String::new();
+
         // wait resp
-        println!("Start wait resp");
+        println!("Start waiting resp");
         let buf_reader = BufReader::new(&mut stream);
         let res: String = buf_reader
             .lines()
             .map(|result| result.unwrap())
-            .take_while(|line| !line.is_empty())
+            .take(1)
             .collect();
-
-        println!("Finish wait resp");
+        println!("Finish waiting resp {:?}", res);
 
         Ok(Response::try_from(serde_json::from_str::<
             ResponseSerializer<Value>,

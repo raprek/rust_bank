@@ -27,7 +27,7 @@ pub struct AccountSerializer {
     pub trs: Vec<usize>,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum Method {
     CreteAccount,
     IncrBalance,
@@ -45,7 +45,7 @@ pub enum RespCode {
     ERR,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Request<P: Serialize> {
     pub id: Uuid,
     pub method: Method,

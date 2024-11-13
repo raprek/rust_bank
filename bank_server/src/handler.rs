@@ -66,7 +66,10 @@ impl<
             let bank = handler.clone().lock().unwrap().bank.clone();
 
             thread::spawn(move || {
-                let _ = Self::handle_msg(bank, h_item.req, h_item.stream);
+                match Self::handle_msg(bank, h_item.req.clone(), h_item.stream) {
+                    Ok(_) => println!("Item suc handled. Req: {:?}", h_item.req),
+                    Err(_) => println!("Error handling item. Req: {:?}", h_item.req),
+                }  
             });
         })
     }
@@ -194,8 +197,8 @@ impl<
                 }
             }
         };
-        
         stream.write_all(b"\n")?;
+        println!("Finish write response");
         Ok(())
     }
 
