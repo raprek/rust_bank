@@ -1,14 +1,18 @@
 use std::{
     io::{BufRead, BufReader, Write},
-    net::TcpListener,
+    net::{SocketAddr, TcpListener, TcpStream},
+    sync::{Arc, Mutex, RwLock},
+    thread::{self, JoinHandle},
     time::Duration,
 };
 
 use bank_core::bank::storage::{AccountStorage, TransactionStorage};
 use bank_protocol::types::{Request, RequestSerializer};
-use serde_json::Value;
+use chan::{Receiver, Sender};
+use serde::ser;
+use serde_json::{to_string, Value};
 
-use crate::handler::Handler;
+use crate::handler::{self, Handler};
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -22,62 +26,94 @@ impl From<std::io::Error> for Error {
     }
 }
 
+#[derive(Debug)]
+pub struct HandleItem {
+    pub req: Request<Value>,
+    pub stream: TcpStream,
+}
+
 // server
-pub struct Server<A: AccountStorage + Default, T: TransactionStorage + Default> {
-    handler: Handler<A, T>,
+pub struct Server {
     host: String,
     port: usize,
     timeout: Option<Duration>,
+    handler_send: Sender<HandleItem>,
 }
 
-impl<A: AccountStorage + Default, T: TransactionStorage + Default> Server<A, T> {
+impl Server {
     pub fn new(
-        handler: Handler<A, T>,
         host: Option<String>,
         port: Option<usize>,
         timeout: Option<Duration>,
+        handler_send: Sender<HandleItem>,
     ) -> Self {
         Self {
-            handler,
             host: host.unwrap_or("127.0.0.1".to_string()),
             port: port.unwrap_or(8080),
             timeout,
+            handler_send,
+        }
+    }
+
+    pub fn handle_connection(
+        mut stream: TcpStream,
+        send: Sender<HandleItem>,
+        addr: String,
+    ) -> Result<(), std::io::Error> {
+        loop {
+            let mut req = String::new();
+            let mut reader = BufReader::new(stream.try_clone().unwrap());
+            reader.read_line(&mut req)?;
+            if req.len() == 0 {
+                println!("Client {addr} disconnected");
+                return Ok(());
+            }
+
+            // unpack request
+            println!("Request received. Client {addr}. Msg: {req}");
+            match serde_json::from_str::<RequestSerializer<Value>>(req.as_str()) {
+                Ok(req) => {
+                    let to_send = HandleItem {
+                        req: Request::try_from(req).unwrap(),
+                        stream: stream.try_clone().unwrap(),
+                    };
+                    send.send(to_send);
+
+                    println!("Msg req sent to handler");
+                }
+                Err(_) => {
+                    stream.write_all(b"wrong msg format\n")?;
+                    continue;
+                }
+            };
         }
     }
 
     // runs sync server
-    pub fn run(&mut self) -> Result<(), Error> {
-        let addr = format!("{}:{}", self.host, self.port);
-        let listener = TcpListener::bind(&addr).unwrap();
-        println!("Bank one thread server started on: {addr}");
-        loop {
-            if let Ok((mut stream, addr)) = listener.accept() {
-                println!("New client. Client {addr}");
-                stream.set_read_timeout(self.timeout).unwrap();
-                stream.set_write_timeout(self.timeout).unwrap();
-
-                // read response
-                let mut response = String::new();
-                let mut reader = BufReader::new(&stream);
-                reader.read_line(&mut response)?;
-
-                // unpack request
-                println!("Request received. Client {addr}. Msg: {response}");
-                let msg: RequestSerializer<Value> = match serde_json::from_str(response.as_str()) {
-                    Ok(msg) => msg,
-                    Err(_) => {
-                        let _ = stream.write_all(b"wrong msg format");
-                        continue;
-                    }
-                };
-                let req = Request::try_from(msg).unwrap();
-                match self.handler.handle_msg(req, stream) {
-                    Ok(_) => println!("Req SUCCESSFULLY processed. Client {addr}"),
-                    Err(err) => println!("Req FAILED processed. Client {addr}. Error: {err}"),
+    pub fn run(server: Arc<Mutex<Self>>) -> Result<JoinHandle<()>, Error> {
+        Ok(thread::spawn(move || {
+            let addr = {
+                let q_s = server.lock().unwrap();
+                format!("{}:{}", q_s.host, q_s.port)
+            };
+            let listener = TcpListener::bind(&addr).unwrap();
+            println!("Bank one thread server started on: {addr}");
+            loop {
+                if let Ok((mut stream, addr)) = listener.accept() {
+                    println!("New client. Client {addr}");
+                    let timeout = { server.lock().unwrap().timeout };
+                    stream.set_read_timeout(timeout).unwrap();
+                    stream.set_write_timeout(timeout).unwrap();
+                    let addr = addr.to_string();
+                    let send = { server.lock().unwrap().handler_send.clone() };
+                    // read response
+                    thread::spawn(|| {
+                        let _ = Self::handle_connection(stream, send, addr);
+                    });
+                } else {
+                    print!("Error getting connection")
                 }
-            } else {
-                print!("Error getting connection")
             }
-        }
+        }))
     }
 }

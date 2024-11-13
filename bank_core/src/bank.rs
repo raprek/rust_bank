@@ -7,6 +7,7 @@ use storage::{
 pub mod implements;
 pub mod storage;
 
+#[derive(Debug)]
 pub struct Bank<A: AccountStorage, T: TransactionStorage> {
     acc_storage: A,
     tr_storage: T,
