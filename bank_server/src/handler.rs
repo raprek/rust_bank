@@ -69,7 +69,7 @@ impl<
                 match Self::handle_msg(bank, h_item.req.clone(), h_item.stream) {
                     Ok(_) => println!("Item suc handled. Req: {:?}", h_item.req),
                     Err(_) => println!("Error handling item. Req: {:?}", h_item.req),
-                }  
+                }
             });
         })
     }

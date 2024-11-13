@@ -124,8 +124,6 @@ impl Client {
         serde_json::to_writer(&stream, &RequestSerializer::from(req))?;
         stream.write_all(b"\n")?;
 
-        let mut res = String::new();
-
         // wait resp
         println!("Start waiting resp");
         let buf_reader = BufReader::new(&mut stream);
