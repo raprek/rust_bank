@@ -1,7 +1,4 @@
-use std::{
-    sync::{Arc, Mutex, RwLock},
-    thread,
-};
+use std::sync::{Arc, Mutex};
 
 use bank_core::bank::{
     implements::memory::storage::{MemAccountStorage, MemTransactionStorage},

@@ -1,4 +1,3 @@
-use std::io::LineWriter;
 use std::sync::{Arc, Mutex, RwLock};
 use std::thread::{self, JoinHandle};
 use std::{io::Write, net::TcpStream};
@@ -14,7 +13,7 @@ use bank_protocol::types::{
     ResponseErrorPayload, ResponseSerializer, ResponseShortTrPayload, ResponseTrPayload,
     ResponseTrsPayload, TransactionActionSerializer, TransactionSerializer,
 };
-use chan::{Receiver, Sender};
+use chan::Receiver;
 use serde_json::Value;
 
 use crate::server::HandleItem;
@@ -23,8 +22,6 @@ use crate::server::HandleItem;
 pub struct Handler<A: AccountStorage + Default, T: TransactionStorage + Default> {
     bank: Arc<RwLock<Bank<A, T>>>,
     recv_chan: Receiver<HandleItem>,
-    // max_number_of_msgs: usize,
-    // handling_msgs: Arc<RwLock<usize>>
 }
 
 struct Tr(Transaction);
@@ -63,7 +60,7 @@ impl<
     pub fn run(handler: Arc<Mutex<Self>>) -> JoinHandle<()> {
         println!("Handler started");
         thread::spawn(move || loop {
-            let mut h_item = { handler.clone().lock().unwrap().recv_chan.recv().unwrap() };
+            let h_item = { handler.clone().lock().unwrap().recv_chan.recv().unwrap() };
 
             println!("New msg in handler {:?}", h_item.req);
             let bank = handler.clone().lock().unwrap().bank.clone();
@@ -197,6 +194,7 @@ impl<
                 }
             }
         };
+        
         stream.write_all(b"\n")?;
         Ok(())
     }

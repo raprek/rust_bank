@@ -1,18 +1,14 @@
 use std::{
     io::{BufRead, BufReader, Write},
-    net::{SocketAddr, TcpListener, TcpStream},
-    sync::{Arc, Mutex, RwLock},
+    net::{TcpListener, TcpStream},
+    sync::{Arc, Mutex},
     thread::{self, JoinHandle},
     time::Duration,
 };
 
-use bank_core::bank::storage::{AccountStorage, TransactionStorage};
 use bank_protocol::types::{Request, RequestSerializer};
-use chan::{Receiver, Sender};
-use serde::ser;
-use serde_json::{to_string, Value};
-
-use crate::handler::{self, Handler};
+use chan::Sender;
+use serde_json::Value;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -64,7 +60,7 @@ impl Server {
             let mut req = String::new();
             let mut reader = BufReader::new(stream.try_clone().unwrap());
             reader.read_line(&mut req)?;
-            if req.len() == 0 {
+            if req.is_empty() {
                 println!("Client {addr} disconnected");
                 return Ok(());
             }
@@ -99,7 +95,7 @@ impl Server {
             let listener = TcpListener::bind(&addr).unwrap();
             println!("Bank one thread server started on: {addr}");
             loop {
-                if let Ok((mut stream, addr)) = listener.accept() {
+                if let Ok((stream, addr)) = listener.accept() {
                     println!("New client. Client {addr}");
                     let timeout = { server.lock().unwrap().timeout };
                     stream.set_read_timeout(timeout).unwrap();

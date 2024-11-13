@@ -133,7 +133,7 @@ impl Client {
             .take_while(|line| !line.is_empty())
             .collect();
 
-        println!("Start wait resp");
+        println!("Finish wait resp");
 
         Ok(Response::try_from(serde_json::from_str::<
             ResponseSerializer<Value>,
