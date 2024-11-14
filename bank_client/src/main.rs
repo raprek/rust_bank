@@ -1,10 +1,8 @@
-use std::time::Duration;
-
 use bank_client::client::Client;
 
 #[tokio::main]
 async fn main() {
-    let client = Client::new("127.0.0.1:3000".to_string(), Duration::from_secs(30));
+    let client = Client::new("127.0.0.1:3000".to_string());
 
     // create account
     // first shows suc creating of acc
@@ -38,7 +36,10 @@ async fn main() {
         Err(err) => println!("Error creating account, error: {:?}", err),
     }
 
-    match client.make_transaction("test_acc".to_string(), "test_acc_2".to_string(), 10).await {
+    match client
+        .make_transaction("test_acc".to_string(), "test_acc_2".to_string(), 10)
+        .await
+    {
         Ok(tr) => println!("Transaction made, tr_id: {:?}", tr),
         Err(err) => println!("Error making transaction, error: {:?}", err),
     }

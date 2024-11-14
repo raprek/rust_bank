@@ -1,6 +1,4 @@
-
-use std::time::Duration;
-use std::{io::Write, vec::Vec};
+use std::vec::Vec;
 
 use bank_protocol::types::{
     Method, Request, RequestAccountTransactionsPayload, RequestBalancePayload,
@@ -17,7 +15,6 @@ use tokio::net::TcpStream;
 
 pub struct Client {
     server_addr: String,
-    timeout: Duration,
 }
 
 #[derive(Debug)]
@@ -109,14 +106,14 @@ impl From<TransactionSerializer> for Transaction {
 // impl From<Transaction>
 
 impl Client {
-    pub fn new(server_addr: String, timeout: Duration) -> Self {
-        Self {
-            server_addr,
-            timeout,
-        }
+    pub fn new(server_addr: String) -> Self {
+        Self { server_addr }
     }
 
-    pub async fn send_request<R: Serialize>(&self, req: Request<R>) -> Result<Response<Value>, Error> {
+    pub async fn send_request<R: Serialize>(
+        &self,
+        req: Request<R>,
+    ) -> Result<Response<Value>, Error> {
         // set timeout
         let mut stream = TcpStream::connect(self.server_addr.clone()).await?;
 
@@ -260,7 +257,10 @@ impl Client {
         }
     }
 
-    pub async fn account_transactions(&self, account_name: String) -> Result<Vec<Transaction>, Error> {
+    pub async fn account_transactions(
+        &self,
+        account_name: String,
+    ) -> Result<Vec<Transaction>, Error> {
         let req = Request::new(
             Method::AccountTransactions,
             RequestAccountTransactionsPayload { account_name },

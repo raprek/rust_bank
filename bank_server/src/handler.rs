@@ -1,6 +1,4 @@
-use std::io::Write;
 use std::sync::Arc;
-use std::thread::{self};
 
 use bank_core::bank::{
     storage::{AccountStorage, TransactionAction, TransactionStorage},
@@ -14,11 +12,8 @@ use bank_protocol::types::{
     ResponseTrsPayload, TransactionActionSerializer, TransactionSerializer,
 };
 use serde_json::Value;
-use tokio::io::AsyncWriteExt;
-use tokio::net::TcpStream;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::{Mutex, RwLock};
-use tokio::task::JoinHandle;
 
 use crate::server::HandleItem;
 
@@ -61,7 +56,7 @@ impl<
     }
 
     // runs server
-    pub async fn run(handler: Arc<Mutex<Self>>) -> () {
+    pub async fn run(handler: Arc<Mutex<Self>>) {
         println!("Handler started");
         tokio::spawn(async move {
             loop {
@@ -77,13 +72,12 @@ impl<
                 });
             }
         });
-        return ();
     }
 
     pub async fn handle_msg(
         bank: Arc<RwLock<Bank<A, T>>>,
         req: Request<Value>,
-        mut resp_sender: tokio::sync::mpsc::Sender<String>,
+        resp_sender: tokio::sync::mpsc::Sender<String>,
     ) -> Result<(), std::io::Error> {
         let req_id = req.id;
         let res = match req.method {

@@ -1,4 +1,4 @@
-use std::{sync::Arc, thread::JoinHandle, time::Duration};
+use std::{sync::Arc, thread::JoinHandle};
 use tokio::io::BufReader;
 use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt},
@@ -9,7 +9,6 @@ use tokio::{
 use bank_protocol::types::{Request, RequestSerializer};
 
 use serde_json::Value;
-use tokio::sync::mpsc::{Receiver, Sender};
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -26,6 +25,7 @@ impl From<std::io::Error> for Error {
 #[derive(Debug)]
 pub struct HandleItem {
     pub req: Request<Value>,
+    // channel to send resp to handler
     pub resp_sender: tokio::sync::mpsc::Sender<String>,
 }
 
@@ -33,6 +33,7 @@ pub struct HandleItem {
 pub struct Server {
     host: String,
     port: usize,
+    // channel to send msgs to handler
     handler_send: tokio::sync::mpsc::Sender<HandleItem>,
 }
 
@@ -49,6 +50,7 @@ impl Server {
         }
     }
 
+    // handle async connection
     pub async fn handle_connection(
         stream: TcpStream,
         send: tokio::sync::mpsc::Sender<HandleItem>,
