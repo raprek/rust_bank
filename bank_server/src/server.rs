@@ -1,14 +1,15 @@
-use std::{
-    io::{BufRead, BufReader, Write},
+use std::{sync::Arc, thread::JoinHandle, time::Duration};
+use tokio::io::BufReader;
+use tokio::{
+    io::{AsyncBufReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
-    sync::{Arc, Mutex},
-    thread::{self, JoinHandle},
-    time::Duration,
+    sync::Mutex,
 };
 
 use bank_protocol::types::{Request, RequestSerializer};
-use chan::Sender;
+
 use serde_json::Value;
+use tokio::sync::mpsc::{Receiver, Sender};
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -25,91 +26,84 @@ impl From<std::io::Error> for Error {
 #[derive(Debug)]
 pub struct HandleItem {
     pub req: Request<Value>,
-    pub stream: TcpStream,
+    pub resp_sender: tokio::sync::mpsc::Sender<String>,
 }
 
 // server
 pub struct Server {
     host: String,
     port: usize,
-    timeout: Option<Duration>,
-    handler_send: Sender<HandleItem>,
+    handler_send: tokio::sync::mpsc::Sender<HandleItem>,
 }
 
 impl Server {
     pub fn new(
         host: Option<String>,
         port: Option<usize>,
-        timeout: Option<Duration>,
-        handler_send: Sender<HandleItem>,
+        handler_send: tokio::sync::mpsc::Sender<HandleItem>,
     ) -> Self {
         Self {
             host: host.unwrap_or("127.0.0.1".to_string()),
             port: port.unwrap_or(8080),
-            timeout,
             handler_send,
         }
     }
 
-    pub fn handle_connection(
-        mut stream: TcpStream,
-        send: Sender<HandleItem>,
+    pub async fn handle_connection(
+        stream: TcpStream,
+        send: tokio::sync::mpsc::Sender<HandleItem>,
         addr: String,
-    ) -> Result<(), std::io::Error> {
+    ) {
+        let mut reader = BufReader::new(stream);
+        let (resp_sender, mut resp_reader) = tokio::sync::mpsc::channel::<String>(1);
         loop {
-            let mut req = String::new();
-            let mut reader = BufReader::new(stream.try_clone().unwrap());
-            reader.read_line(&mut req)?;
-            if req.is_empty() {
-                println!("Client {addr} disconnected");
-                return Ok(());
-            }
-
-            // unpack request
-            println!("Request received. Client {addr}. Msg: {req}");
-            match serde_json::from_str::<RequestSerializer<Value>>(req.as_str()) {
-                Ok(req) => {
-                    let to_send = HandleItem {
-                        req: Request::try_from(req).unwrap(),
-                        stream: stream.try_clone().unwrap(),
+            let mut buf = String::new();
+            tokio::select! {
+                resp = resp_reader.recv() => {
+                    reader.write_all(resp.unwrap().as_bytes()).await.unwrap();
+                    reader.write_all(b"\n").await.unwrap();
+                },
+                _ = reader.read_line(&mut buf) => {
+                    if buf.is_empty() {
+                        println!("Client {addr} disconnected");
+                        return
                     };
-                    send.send(to_send);
+                    println!("Request received. Client {addr}. Msg: {buf}");
+                    match serde_json::from_str::<RequestSerializer<Value>>(buf.as_str()) {
+                        Ok(req) => {
+                            let to_send = HandleItem {
+                                req: Request::try_from(req).unwrap(),
+                                resp_sender: resp_sender.clone(),
+                            };
+                            send.send(to_send).await.unwrap();
+                            println!("Msg req sent to handler");
+                        }
+                        Err(_) => {
+                            reader.write_all(b"wrong msg format\n").await.unwrap();
+                            continue;
+                        }
+                    };
+                }
 
-                    println!("Msg req sent to handler");
-                }
-                Err(_) => {
-                    stream.write_all(b"wrong msg format\n")?;
-                    continue;
-                }
             };
         }
     }
 
     // runs sync server
-    pub fn run(server: Arc<Mutex<Self>>) -> Result<JoinHandle<()>, Error> {
-        Ok(thread::spawn(move || {
-            let addr = {
-                let q_s = server.lock().unwrap();
-                format!("{}:{}", q_s.host, q_s.port)
-            };
-            let listener = TcpListener::bind(&addr).unwrap();
-            println!("Bank one thread server started on: {addr}");
-            loop {
-                if let Ok((stream, addr)) = listener.accept() {
-                    println!("New client. Client {addr}");
-                    let timeout = { server.lock().unwrap().timeout };
-                    stream.set_read_timeout(timeout).unwrap();
-                    stream.set_write_timeout(timeout).unwrap();
-                    let addr = addr.to_string();
-                    let send = { server.lock().unwrap().handler_send.clone() };
-                    // read response
-                    thread::spawn(|| {
-                        let _ = Self::handle_connection(stream, send, addr);
-                    });
-                } else {
-                    print!("Error getting connection")
-                }
-            }
-        }))
+    pub async fn run(server: Arc<Mutex<Self>>) -> Result<JoinHandle<()>, Error> {
+        let addr = {
+            let q_s = server.lock().await;
+            format!("{}:{}", q_s.host, q_s.port)
+        };
+        let listener = TcpListener::bind(addr.clone()).await.unwrap();
+        println!("Bank one thread server started on: {addr}");
+        loop {
+            let (stream, addr) = listener.accept().await?;
+            println!("New connection {addr}");
+            let send = { server.lock().await.handler_send.clone() };
+            tokio::spawn(async move {
+                let _ = Self::handle_connection(stream, send, addr.to_string()).await;
+            });
+        }
     }
 }

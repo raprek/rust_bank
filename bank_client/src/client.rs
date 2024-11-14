@@ -1,6 +1,6 @@
-use std::io::{BufRead, BufReader};
+
 use std::time::Duration;
-use std::{io::Write, net::TcpStream, vec::Vec};
+use std::{io::Write, vec::Vec};
 
 use bank_protocol::types::{
     Method, Request, RequestAccountTransactionsPayload, RequestBalancePayload,
@@ -12,6 +12,8 @@ use bank_protocol::types::{
 };
 use serde::Serialize;
 use serde_json::Value;
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::net::TcpStream;
 
 pub struct Client {
     server_addr: String,
@@ -114,24 +116,19 @@ impl Client {
         }
     }
 
-    pub fn send_request<R: Serialize>(&self, req: Request<R>) -> Result<Response<Value>, Error> {
+    pub async fn send_request<R: Serialize>(&self, req: Request<R>) -> Result<Response<Value>, Error> {
         // set timeout
-        let mut stream = TcpStream::connect(self.server_addr.clone())?;
-        stream.set_read_timeout(Some(self.timeout)).unwrap();
-        stream.set_write_timeout(Some(self.timeout)).unwrap();
+        let mut stream = TcpStream::connect(self.server_addr.clone()).await?;
 
         // write resp
-        serde_json::to_writer(&stream, &RequestSerializer::from(req))?;
-        stream.write_all(b"\n")?;
+        let req = serde_json::to_string(&RequestSerializer::from(req))?;
+        stream.write_all(format!("{req}\n").as_bytes()).await?;
 
         // wait resp
         println!("Start waiting resp");
-        let buf_reader = BufReader::new(&mut stream);
-        let res: String = buf_reader
-            .lines()
-            .map(|result| result.unwrap())
-            .take(1)
-            .collect();
+        let mut buf_reader = BufReader::new(&mut stream);
+        let mut res = String::new();
+        buf_reader.read_line(&mut res).await?;
         println!("Finish waiting resp {:?}", res);
 
         Ok(Response::try_from(serde_json::from_str::<
@@ -139,12 +136,12 @@ impl Client {
         >(res.as_str())?)?)
     }
 
-    pub fn create_account(&self, account_name: String) -> Result<Account, Error> {
+    pub async fn create_account(&self, account_name: String) -> Result<Account, Error> {
         let req = Request::new(
             Method::CreteAccount,
             RequestCreateAccountPayload { account_name },
         );
-        let resp = self.send_request(req)?;
+        let resp = self.send_request(req).await?;
         match resp.code {
             bank_protocol::types::RespCode::OK => {
                 let payload: ResponseAccountPayload =
@@ -159,7 +156,7 @@ impl Client {
     }
 
     // increments acc balance. Returns transaction id
-    pub fn incr_balance(&self, account_name: String, value: usize) -> Result<usize, Error> {
+    pub async fn incr_balance(&self, account_name: String, value: usize) -> Result<usize, Error> {
         let req = Request::new(
             Method::IncrBalance,
             RequestIncrBalancePayload {
@@ -167,7 +164,7 @@ impl Client {
                 value,
             },
         );
-        let resp = self.send_request(req)?;
+        let resp = self.send_request(req).await?;
         match resp.code {
             bank_protocol::types::RespCode::OK => {
                 let payload: ResponseShortTrPayload =
@@ -182,7 +179,7 @@ impl Client {
     }
 
     // decrements acc balance. Returns transaction id
-    pub fn decr_balance(&self, account_name: String, value: usize) -> Result<usize, Error> {
+    pub async fn decr_balance(&self, account_name: String, value: usize) -> Result<usize, Error> {
         let req = Request::new(
             Method::DecrBalance,
             RequestDecrBalancePayload {
@@ -190,7 +187,7 @@ impl Client {
                 value,
             },
         );
-        let resp = self.send_request(req)?;
+        let resp = self.send_request(req).await?;
         match resp.code {
             bank_protocol::types::RespCode::OK => {
                 let payload: ResponseShortTrPayload =
@@ -205,7 +202,7 @@ impl Client {
     }
 
     // decrements acc balance. Returns transaction id
-    pub fn make_transaction(
+    pub async fn make_transaction(
         &self,
         account_name: String,
         account_to_name: String,
@@ -219,7 +216,7 @@ impl Client {
                 account_to_name,
             },
         );
-        let resp = self.send_request(req)?;
+        let resp = self.send_request(req).await?;
         match resp.code {
             bank_protocol::types::RespCode::OK => {
                 let payload: ResponseShortTrPayload =
@@ -233,9 +230,9 @@ impl Client {
         }
     }
 
-    pub fn transaction(&self, id: usize) -> Result<Transaction, Error> {
+    pub async fn transaction(&self, id: usize) -> Result<Transaction, Error> {
         let req = Request::new(Method::Transaction, RequestTransactionByIdPayload { id });
-        let resp = self.send_request(req)?;
+        let resp = self.send_request(req).await?;
         match resp.code {
             bank_protocol::types::RespCode::OK => {
                 let payload: ResponseTrPayload = serde_json::from_value(resp.payload.unwrap())?;
@@ -248,9 +245,9 @@ impl Client {
         }
     }
 
-    pub fn transactions(&self) -> Result<Vec<Transaction>, Error> {
+    pub async fn transactions(&self) -> Result<Vec<Transaction>, Error> {
         let req = Request::new(Method::Transactions, RequestTransactionsPayload {});
-        let resp = self.send_request(req)?;
+        let resp = self.send_request(req).await?;
         match resp.code {
             bank_protocol::types::RespCode::OK => {
                 let payload: ResponseTrsPayload = serde_json::from_value(resp.payload.unwrap())?;
@@ -263,12 +260,12 @@ impl Client {
         }
     }
 
-    pub fn account_transactions(&self, account_name: String) -> Result<Vec<Transaction>, Error> {
+    pub async fn account_transactions(&self, account_name: String) -> Result<Vec<Transaction>, Error> {
         let req = Request::new(
             Method::AccountTransactions,
             RequestAccountTransactionsPayload { account_name },
         );
-        let resp = self.send_request(req)?;
+        let resp = self.send_request(req).await?;
         match resp.code {
             bank_protocol::types::RespCode::OK => {
                 let payload: ResponseTrsPayload = serde_json::from_value(resp.payload.unwrap())?;
@@ -281,12 +278,12 @@ impl Client {
         }
     }
 
-    pub fn account_balance(&self, account_name: String) -> Result<usize, Error> {
+    pub async fn account_balance(&self, account_name: String) -> Result<usize, Error> {
         let req = Request::new(
             Method::AccountBalance,
             RequestBalancePayload { account_name },
         );
-        let resp = self.send_request(req)?;
+        let resp = self.send_request(req).await?;
         match resp.code {
             bank_protocol::types::RespCode::OK => {
                 let payload: ResponseBalancePayload =

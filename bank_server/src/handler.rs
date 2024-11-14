@@ -1,6 +1,6 @@
-use std::sync::{Arc, Mutex, RwLock};
-use std::thread::{self, JoinHandle};
-use std::{io::Write, net::TcpStream};
+use std::io::Write;
+use std::sync::Arc;
+use std::thread::{self};
 
 use bank_core::bank::{
     storage::{AccountStorage, TransactionAction, TransactionStorage},
@@ -13,8 +13,12 @@ use bank_protocol::types::{
     ResponseErrorPayload, ResponseSerializer, ResponseShortTrPayload, ResponseTrPayload,
     ResponseTrsPayload, TransactionActionSerializer, TransactionSerializer,
 };
-use chan::Receiver;
 use serde_json::Value;
+use tokio::io::AsyncWriteExt;
+use tokio::net::TcpStream;
+use tokio::sync::mpsc::Receiver;
+use tokio::sync::{Mutex, RwLock};
+use tokio::task::JoinHandle;
 
 use crate::server::HandleItem;
 
@@ -57,152 +61,131 @@ impl<
     }
 
     // runs server
-    pub fn run(handler: Arc<Mutex<Self>>) -> JoinHandle<()> {
+    pub async fn run(handler: Arc<Mutex<Self>>) -> () {
         println!("Handler started");
-        thread::spawn(move || loop {
-            let h_item = { handler.clone().lock().unwrap().recv_chan.recv().unwrap() };
+        tokio::spawn(async move {
+            loop {
+                let h_item = { handler.clone().lock().await.recv_chan.recv().await.unwrap() };
 
-            println!("New msg in handler {:?}", h_item.req);
-            let bank = handler.clone().lock().unwrap().bank.clone();
-
-            thread::spawn(move || {
-                match Self::handle_msg(bank, h_item.req.clone(), h_item.stream) {
-                    Ok(_) => println!("Item suc handled. Req: {:?}", h_item.req),
-                    Err(_) => println!("Error handling item. Req: {:?}", h_item.req),
-                }
-            });
-        })
+                println!("New msg in handler {:?}", h_item.req);
+                let bank = handler.clone().lock().await.bank.clone();
+                tokio::spawn(async move {
+                    match Self::handle_msg(bank, h_item.req.clone(), h_item.resp_sender).await {
+                        Ok(_) => println!("Item suc handled. Req: {:?}", h_item.req),
+                        Err(_) => println!("Error handling item. Req: {:?}", h_item.req),
+                    }
+                });
+            }
+        });
+        return ();
     }
 
-    pub fn handle_msg(
+    pub async fn handle_msg(
         bank: Arc<RwLock<Bank<A, T>>>,
         req: Request<Value>,
-        mut stream: TcpStream,
+        mut resp_sender: tokio::sync::mpsc::Sender<String>,
     ) -> Result<(), std::io::Error> {
         let req_id = req.id;
-        let _ = match req.method {
+        let res = match req.method {
             bank_protocol::types::Method::CreteAccount => {
-                match Self::handle_create_account(bank, req) {
+                match Self::handle_create_account(bank, req).await {
                     Ok(acc) => {
                         let payload = acc;
-                        serde_json::to_writer(
-                            &stream,
-                            &ResponseSerializer::from(Response::<ResponseAccountPayload>::ok(
-                                req_id,
-                                Some(payload),
-                            )),
-                        )
+                        serde_json::to_string(&ResponseSerializer::from(Response::<
+                            ResponseAccountPayload,
+                        >::ok(
+                            req_id, Some(payload)
+                        )))?
                     }
-                    Err(err) => serde_json::to_writer(
-                        &stream,
-                        &ResponseSerializer::from(err.to_response(req_id)),
-                    ),
+                    Err(err) => {
+                        serde_json::to_string(&ResponseSerializer::from(err.to_response(req_id)))?
+                    }
                 }
             }
-            bank_protocol::types::Method::IncrBalance => match Self::handle_incr_balance(bank, req)
-            {
-                Ok(id) => serde_json::to_writer(
-                    &stream,
-                    &ResponseSerializer::from(Response::ok(
+            bank_protocol::types::Method::IncrBalance => {
+                match Self::handle_incr_balance(bank, req).await {
+                    Ok(id) => serde_json::to_string(&ResponseSerializer::from(Response::ok(
                         req_id,
                         Some(ResponseShortTrPayload { id }),
-                    )),
-                ),
-                Err(err) => serde_json::to_writer(
-                    &stream,
-                    &ResponseSerializer::from(err.to_response(req_id)),
-                ),
-            },
-            bank_protocol::types::Method::DecrBalance => match Self::handle_decr_balance(bank, req)
-            {
-                Ok(id) => serde_json::to_writer(
-                    &stream,
-                    &ResponseSerializer::from(Response::ok(
+                    )))?,
+                    Err(err) => {
+                        serde_json::to_string(&ResponseSerializer::from(err.to_response(req_id)))?
+                    }
+                }
+            }
+            bank_protocol::types::Method::DecrBalance => {
+                match Self::handle_decr_balance(bank, req).await {
+                    Ok(id) => serde_json::to_string(&ResponseSerializer::from(Response::ok(
                         req_id,
                         Some(ResponseShortTrPayload { id }),
-                    )),
-                ),
-                Err(err) => serde_json::to_writer(
-                    &stream,
-                    &ResponseSerializer::from(err.to_response(req_id)),
-                ),
-            },
+                    )))?,
+                    Err(err) => {
+                        serde_json::to_string(&ResponseSerializer::from(err.to_response(req_id)))?
+                    }
+                }
+            }
             bank_protocol::types::Method::MakeTransaction => {
-                match Self::handler_make_transaction(bank, req) {
-                    Ok(id) => serde_json::to_writer(
-                        &stream,
-                        &ResponseSerializer::from(Response::ok(
-                            req_id,
-                            Some(ResponseShortTrPayload { id }),
-                        )),
-                    ),
-                    Err(err) => serde_json::to_writer(
-                        &stream,
-                        &ResponseSerializer::from(err.to_response(req_id)),
-                    ),
+                match Self::handler_make_transaction(bank, req).await {
+                    Ok(id) => serde_json::to_string(&ResponseSerializer::from(Response::ok(
+                        req_id,
+                        Some(ResponseShortTrPayload { id }),
+                    )))?,
+                    Err(err) => {
+                        serde_json::to_string(&ResponseSerializer::from(err.to_response(req_id)))?
+                    }
                 }
             }
-            bank_protocol::types::Method::Transactions => match Self::handler_transactions(bank) {
-                Ok(trs) => serde_json::to_writer(
-                    &stream,
-                    &ResponseSerializer::from(Response::ok(
+            bank_protocol::types::Method::Transactions => {
+                match Self::handler_transactions(bank).await {
+                    Ok(trs) => serde_json::to_string(&ResponseSerializer::from(Response::ok(
                         req_id,
                         Some(ResponseTrsPayload { trs }),
-                    )),
-                ),
-                Err(err) => serde_json::to_writer(
-                    &stream,
-                    &ResponseSerializer::from(err.to_response(req_id)),
-                ),
-            },
-            bank_protocol::types::Method::Transaction => match Self::handler_transaction(bank, req)
-            {
-                Ok(tr) => serde_json::to_writer(
-                    &stream,
-                    &ResponseSerializer::from(Response::ok(req_id, Some(ResponseTrPayload { tr }))),
-                ),
-                Err(err) => serde_json::to_writer(
-                    &stream,
-                    &ResponseSerializer::from(err.to_response(req_id)),
-                ),
-            },
+                    )))?,
+                    Err(err) => {
+                        serde_json::to_string(&ResponseSerializer::from(err.to_response(req_id)))?
+                    }
+                }
+            }
+            bank_protocol::types::Method::Transaction => {
+                match Self::handler_transaction(bank, req).await {
+                    Ok(tr) => serde_json::to_string(&ResponseSerializer::from(Response::ok(
+                        req_id,
+                        Some(ResponseTrPayload { tr }),
+                    )))?,
+                    Err(err) => {
+                        serde_json::to_string(&ResponseSerializer::from(err.to_response(req_id)))?
+                    }
+                }
+            }
             bank_protocol::types::Method::AccountTransactions => {
-                match Self::handler_account_trs(bank, req) {
-                    Ok(trs) => serde_json::to_writer(
-                        &stream,
-                        &ResponseSerializer::from(Response::ok(
-                            req_id,
-                            Some(ResponseTrsPayload { trs }),
-                        )),
-                    ),
-                    Err(err) => serde_json::to_writer(
-                        &stream,
-                        &ResponseSerializer::from(err.to_response(req_id)),
-                    ),
+                match Self::handler_account_trs(bank, req).await {
+                    Ok(trs) => serde_json::to_string(&ResponseSerializer::from(Response::ok(
+                        req_id,
+                        Some(ResponseTrsPayload { trs }),
+                    )))?,
+                    Err(err) => {
+                        serde_json::to_string(&ResponseSerializer::from(err.to_response(req_id)))?
+                    }
                 }
             }
             bank_protocol::types::Method::AccountBalance => {
-                match Self::handler_account_balance(bank, req) {
-                    Ok(balance) => serde_json::to_writer(
-                        &stream,
-                        &ResponseSerializer::from(Response::ok(
-                            req_id,
-                            Some(ResponseBalancePayload { balance }),
-                        )),
-                    ),
-                    Err(err) => serde_json::to_writer(
-                        &stream,
-                        &ResponseSerializer::from(err.to_response(req_id)),
-                    ),
+                match Self::handler_account_balance(bank, req).await {
+                    Ok(balance) => serde_json::to_string(&ResponseSerializer::from(Response::ok(
+                        req_id,
+                        Some(ResponseBalancePayload { balance }),
+                    )))?,
+                    Err(err) => {
+                        serde_json::to_string(&ResponseSerializer::from(err.to_response(req_id)))?
+                    }
                 }
             }
         };
-        stream.write_all(b"\n")?;
+        resp_sender.send(res).await.unwrap();
         println!("Finish write response");
         Ok(())
     }
 
-    fn handle_create_account(
+    async fn handle_create_account(
         bank: Arc<RwLock<Bank<A, T>>>,
         req: Request<Value>,
     ) -> Result<ResponseAccountPayload, ResponseErrorPayload> {
@@ -211,11 +194,11 @@ impl<
             Err(_) => return Err(ResponseErrorPayload::invalid_format()),
         };
         let Account { name, balance, trs } =
-            bank.write().unwrap().create_account(payload.account_name)?;
+            bank.write().await.create_account(payload.account_name)?;
         Ok(ResponseAccountPayload { name, balance, trs })
     }
 
-    fn handle_incr_balance(
+    async fn handle_incr_balance(
         bank: Arc<RwLock<Bank<A, T>>>,
         req: Request<Value>,
     ) -> Result<usize, ResponseErrorPayload> {
@@ -225,11 +208,11 @@ impl<
         };
         Ok(bank
             .write()
-            .unwrap()
+            .await
             .inc_acc_balance(payload.account_name, payload.value)?)
     }
 
-    fn handle_decr_balance(
+    async fn handle_decr_balance(
         bank: Arc<RwLock<Bank<A, T>>>,
         req: Request<Value>,
     ) -> Result<usize, ResponseErrorPayload> {
@@ -239,11 +222,11 @@ impl<
         };
         Ok(bank
             .write()
-            .unwrap()
+            .await
             .decr_acc_balance(payload.account_name, payload.value)?)
     }
 
-    fn handler_make_transaction(
+    async fn handler_make_transaction(
         bank: Arc<RwLock<Bank<A, T>>>,
         req: Request<Value>,
     ) -> Result<usize, ResponseErrorPayload> {
@@ -252,7 +235,7 @@ impl<
             Err(_) => return Err(ResponseErrorPayload::invalid_format()),
         };
 
-        let tr = bank.write().unwrap().make_transaction(
+        let tr = bank.write().await.make_transaction(
             payload.account_name,
             payload.account_to_name,
             payload.value,
@@ -260,19 +243,19 @@ impl<
         Ok(tr)
     }
 
-    fn handler_transactions(
+    async fn handler_transactions(
         bank: Arc<RwLock<Bank<A, T>>>,
     ) -> Result<Vec<TransactionSerializer>, ResponseErrorPayload> {
         Ok(bank
             .read()
-            .unwrap()
+            .await
             .transactions()?
             .into_iter()
             .map(|tr| TransactionSerializer::from(Tr(tr)))
             .collect())
     }
 
-    fn handler_transaction(
+    async fn handler_transaction(
         bank: Arc<RwLock<Bank<A, T>>>,
         req: Request<Value>,
     ) -> Result<TransactionSerializer, ResponseErrorPayload> {
@@ -282,11 +265,11 @@ impl<
         };
         Ok(TransactionSerializer::from(Tr(bank
             .read()
-            .unwrap()
+            .await
             .transaction_by_id(payload.id)?)))
     }
 
-    fn handler_account_trs(
+    async fn handler_account_trs(
         bank: Arc<RwLock<Bank<A, T>>>,
         req: Request<Value>,
     ) -> Result<Vec<TransactionSerializer>, ResponseErrorPayload> {
@@ -297,14 +280,14 @@ impl<
         };
         Ok(bank
             .write()
-            .unwrap()
+            .await
             .account_transactions(payload.account_name)?
             .into_iter()
             .map(|tr| TransactionSerializer::from(Tr(tr)))
             .collect())
     }
 
-    fn handler_account_balance(
+    async fn handler_account_balance(
         bank: Arc<RwLock<Bank<A, T>>>,
         req: Request<Value>,
     ) -> Result<usize, ResponseErrorPayload> {
@@ -312,6 +295,6 @@ impl<
             Ok(payload) => payload,
             Err(_) => return Err(ResponseErrorPayload::invalid_format()),
         };
-        Ok(bank.read().unwrap().account_balance(payload.account_name)?)
+        Ok(bank.read().await.account_balance(payload.account_name)?)
     }
 }
