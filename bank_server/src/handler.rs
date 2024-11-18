@@ -1,4 +1,4 @@
-use std::{sync::Arc};
+use std::sync::Arc;
 
 use bank_core::bank::{
     storage::{AccountStorage, TransactionAction, TransactionStorage},
@@ -12,10 +12,10 @@ use bank_protocol::types::{
     ResponseTrsPayload, TransactionActionSerializer, TransactionSerializer,
 };
 use serde_json::Value;
+use tokio::sync::RwLock;
 use tokio::{sync::mpsc::Receiver, task::JoinHandle};
-use tokio::sync::{Mutex, RwLock};
 
-use crate::{handler, server::HandleItem};
+use crate::server::HandleItem;
 
 #[derive(Debug)]
 pub struct Handler<A: AccountStorage + Default, T: TransactionStorage + Default> {
@@ -56,7 +56,7 @@ impl<
     }
 
     // runs server
-    pub fn run(mut handler: Self) -> JoinHandle<()>{
+    pub fn run(mut handler: Self) -> JoinHandle<()> {
         println!("Handler started");
         tokio::spawn(async move {
             loop {

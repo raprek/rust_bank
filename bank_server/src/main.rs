@@ -22,12 +22,8 @@ async fn main() {
     let h_t = Handler::run(handler);
     let s_t = Server::run(Arc::new(Mutex::new(server))).await.unwrap();
 
-    
     tokio::select! {
         _ = h_t => println!("Handler stopped"),
         _ = s_t => println!("Server stopped")
     };
-
-    
-    
 }
