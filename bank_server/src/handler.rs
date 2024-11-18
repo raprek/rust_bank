@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc};
 
 use bank_core::bank::{
     storage::{AccountStorage, TransactionAction, TransactionStorage},
@@ -12,10 +12,10 @@ use bank_protocol::types::{
     ResponseTrsPayload, TransactionActionSerializer, TransactionSerializer,
 };
 use serde_json::Value;
-use tokio::sync::mpsc::Receiver;
+use tokio::{sync::mpsc::Receiver, task::JoinHandle};
 use tokio::sync::{Mutex, RwLock};
 
-use crate::server::HandleItem;
+use crate::{handler, server::HandleItem};
 
 #[derive(Debug)]
 pub struct Handler<A: AccountStorage + Default, T: TransactionStorage + Default> {
@@ -56,14 +56,13 @@ impl<
     }
 
     // runs server
-    pub async fn run(handler: Arc<Mutex<Self>>) {
+    pub fn run(mut handler: Self) -> JoinHandle<()>{
         println!("Handler started");
         tokio::spawn(async move {
             loop {
-                let h_item = { handler.clone().lock().await.recv_chan.recv().await.unwrap() };
-
+                let h_item = handler.recv_chan.recv().await.unwrap();
                 println!("New msg in handler {:?}", h_item.req);
-                let bank = handler.clone().lock().await.bank.clone();
+                let bank = handler.bank.clone();
                 tokio::spawn(async move {
                     match Self::handle_msg(bank, h_item.req.clone(), h_item.resp_sender).await {
                         Ok(_) => println!("Item suc handled. Req: {:?}", h_item.req),
@@ -71,7 +70,7 @@ impl<
                     }
                 });
             }
-        });
+        })
     }
 
     pub async fn handle_msg(

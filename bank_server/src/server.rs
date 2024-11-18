@@ -1,5 +1,6 @@
-use std::{sync::Arc, thread::JoinHandle};
+use std::{sync::Arc};
 use tokio::io::BufReader;
+use tokio::task::JoinHandle;
 use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
@@ -9,6 +10,8 @@ use tokio::{
 use bank_protocol::types::{Request, RequestSerializer};
 
 use serde_json::Value;
+
+use crate::handler;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -99,13 +102,16 @@ impl Server {
         };
         let listener = TcpListener::bind(addr.clone()).await.unwrap();
         println!("Bank one thread server started on: {addr}");
-        loop {
-            let (stream, addr) = listener.accept().await?;
-            println!("New connection {addr}");
-            let send = { server.lock().await.handler_send.clone() };
-            tokio::spawn(async move {
-                let _ = Self::handle_connection(stream, send, addr.to_string()).await;
-            });
-        }
+        Ok(tokio::spawn(async move  {
+            loop {
+                let (stream, addr) = listener.accept().await.unwrap();
+                println!("New connection {addr}");
+                let send = { server.lock().await.handler_send.clone() };
+                tokio::spawn(async move {
+                    let _ = Self::handle_connection(stream, send, addr.to_string()).await;
+                });
+            }
+        }))
+        
     }
 }
