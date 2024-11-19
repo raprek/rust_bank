@@ -1,5 +1,3 @@
-use std::{thread::sleep, time::Duration};
-
 use bank_core::bank::{
     implements::memory::storage::{MemAccountStorage, MemTransactionStorage},
     Bank,
