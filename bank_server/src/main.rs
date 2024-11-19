@@ -1,3 +1,4 @@
+use std::{thread::sleep, time::Duration};
 
 use bank_core::bank::{
     implements::memory::storage::{MemAccountStorage, MemTransactionStorage},
@@ -18,11 +19,9 @@ async fn main() {
     let handler = Handler::new(bank, recv);
     let server = Server::new(Some("127.0.0.1".to_string()), Some(3000), sender);
     let h_t = Handler::run(handler);
-    let s_t = Server::run(server).await.unwrap();
-
+    let s_t = Server::run(server);
     tokio::select! {
+        _ = s_t => println!("Server stopped"),
         _ = h_t => println!("Handler stopped"),
-        _ = s_t => println!("Server stopped")
     };
-    
 }

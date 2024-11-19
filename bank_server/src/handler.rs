@@ -60,15 +60,16 @@ impl<
         println!("Handler started");
         tokio::spawn(async move {
             loop {
-                let h_item = handler.recv_chan.recv().await.unwrap();
-                println!("New msg in handler {:?}", h_item.req);
-                let bank = handler.bank.clone();
-                tokio::spawn(async move {
-                    match Self::handle_msg(bank, h_item.req.clone(), h_item.resp_sender).await {
-                        Ok(_) => println!("Item suc handled. Req: {:?}", h_item.req),
-                        Err(_) => println!("Error handling item. Req: {:?}", h_item.req),
-                    }
-                });
+                if let Some(h_item) = handler.recv_chan.recv().await {
+                    println!("New msg in handler {:?}", h_item.req);
+                    let bank = handler.bank.clone();
+                    tokio::spawn(async move {
+                        match Self::handle_msg(bank, h_item.req.clone(), h_item.resp_sender).await {
+                            Ok(_) => println!("Item suc handled. Req: {:?}", h_item.req),
+                            Err(_) => println!("Error handling item. Req: {:?}", h_item.req),
+                        }
+                    });
+                };
             }
         })
     }

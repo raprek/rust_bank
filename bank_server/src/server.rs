@@ -91,19 +91,20 @@ impl Server {
     }
 
     // runs sync server
-    pub async fn run(server: Self) -> Result<JoinHandle<()>, Error> {
-        let addr = format!("{}:{}", server.host, server.port);
-        let listener = TcpListener::bind(addr.clone()).await.unwrap();
-        println!("Bank one thread server started on: {addr}");
-        Ok(tokio::spawn(async move {
+    pub fn run(server: Self) -> JoinHandle<()> {
+        tokio::spawn(async move {
+            let addr = format!("{}:{}", server.host, server.port);
+            let listener = TcpListener::bind(addr.clone()).await.unwrap();
+            println!("Bank one thread server started on: {addr}");
             loop {
-                let (stream, addr) = listener.accept().await.unwrap();
-                println!("New connection {addr}");
-                let send = { server.handler_send.clone() };
-                tokio::spawn(async move {
-                    let _ = Self::handle_connection(stream, send, addr.to_string()).await;
-                });
+                if let Ok((stream, addr)) = listener.accept().await {
+                    println!("New connection {addr}");
+                    let send = { server.handler_send.clone() };
+                    tokio::spawn(async move {
+                        let _ = Self::handle_connection(stream, send, addr.to_string()).await;
+                    });
+                };
             }
-        }))
+        })
     }
 }
