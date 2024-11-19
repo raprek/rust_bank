@@ -1,4 +1,3 @@
-use std::sync::Arc;
 
 use bank_core::bank::{
     implements::memory::storage::{MemAccountStorage, MemTransactionStorage},
@@ -8,7 +7,6 @@ use bank_server::{
     handler::Handler,
     server::{HandleItem, Server},
 };
-use tokio::sync::Mutex;
 
 #[tokio::main]
 async fn main() {

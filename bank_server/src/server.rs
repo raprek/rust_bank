@@ -1,10 +1,8 @@
-use std::sync::Arc;
 use tokio::io::BufReader;
 use tokio::task::JoinHandle;
 use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
-    sync::Mutex,
 };
 
 use bank_protocol::types::{Request, RequestSerializer};
