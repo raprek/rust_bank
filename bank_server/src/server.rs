@@ -93,18 +93,15 @@ impl Server {
     }
 
     // runs sync server
-    pub async fn run(server: Arc<Mutex<Self>>) -> Result<JoinHandle<()>, Error> {
-        let addr = {
-            let q_s = server.lock().await;
-            format!("{}:{}", q_s.host, q_s.port)
-        };
+    pub async fn run(server: Self) -> Result<JoinHandle<()>, Error> {
+        let addr = format!("{}:{}", server.host, server.port);
         let listener = TcpListener::bind(addr.clone()).await.unwrap();
         println!("Bank one thread server started on: {addr}");
         Ok(tokio::spawn(async move {
             loop {
                 let (stream, addr) = listener.accept().await.unwrap();
                 println!("New connection {addr}");
-                let send = { server.lock().await.handler_send.clone() };
+                let send = { server.handler_send.clone() };
                 tokio::spawn(async move {
                     let _ = Self::handle_connection(stream, send, addr.to_string()).await;
                 });

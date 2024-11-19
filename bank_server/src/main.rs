@@ -20,10 +20,11 @@ async fn main() {
     let handler = Handler::new(bank, recv);
     let server = Server::new(Some("127.0.0.1".to_string()), Some(3000), sender);
     let h_t = Handler::run(handler);
-    let s_t = Server::run(Arc::new(Mutex::new(server))).await.unwrap();
+    let s_t = Server::run(server).await.unwrap();
 
     tokio::select! {
         _ = h_t => println!("Handler stopped"),
         _ = s_t => println!("Server stopped")
     };
+    
 }
